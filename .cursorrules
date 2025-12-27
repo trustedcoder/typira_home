@@ -1,0 +1,30 @@
+# General Rules
+- You are an expert software engineer and architect with deep knowledge of Flutter, Dart, Python, and modern backend development.
+- Provide concise, accurate, and correct code examples. Avoid conversational filler.
+- Focus on clean, readable, and maintainable code.
+- Follow "Clean Architecture" principles where applicable.
+- When editing code, always output the full file content if the file is small, or use precise search/replace blocks for larger files.
+- Commit messages should be semantic (e.g., `feat:`, `fix:`, `chore:`, `refactor:`).
+
+# Flutter & Dart Rules (Path: mobile/)
+- **Strong Typing**: Always use strong types. Avoid `dynamic` unless absolutely necessary.
+- **Const Correctness**: Use `const` constructors for widgets and value objects whenever possible.
+- **Null Safety**: Embrace null safety. Use `?`, `!`, and `late` appropriately, but prefer safe access `?.` and defaults `??` over force unwrapping `!`.
+- **Async/Await**: Prefer `async`/`await` over raw `Future` and `.then()`.
+- **Widget Structure**: 
+  - Break down large widgets into smaller, reusable components.
+  - Use `StatelessWidget` by default; use `StatefulWidget` only when maintaining local state is required.
+- **State Management**: Make use of Getx only.
+- **Imports**: Prefer absolute imports `package:typira/...` over relative imports `../../`.
+
+# Python Rules (Path: backend_api/)
+- **PEP 8**: Follow standard PEP 8 style guidelines.
+- **Type Hinting**: Use Python type hints (`typing` module) for all function arguments and return values.
+- **Docstrings**: Include docstrings for all public modules, classes, and methods (Google or NumPy style).
+- **Error Handling**: Use explicit `try-except` blocks. Avoid bare `except:`.
+- **Virtual Env**: Assume a virtual environment is active.
+- **Modern Python**: Use modern Python 3.10+ features (e.g., match statements, union types `|`).
+
+# Project Structure specific
+- `backend_api/`: Python backend code.
+- `mobile/`: Flutter mobile application.
