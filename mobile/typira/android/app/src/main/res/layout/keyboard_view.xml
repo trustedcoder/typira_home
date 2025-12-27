@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#D1D4D9">
+
+    <!-- Suggestion Strip -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="45dp"
+        android:background="#E8EAED"
+        android:requiresFadingEdge="horizontal"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp">
+
+            <Button
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="35dp"
+                android:text="✨ Rewrite"
+                android:textAllCaps="false"
+                android:textColor="#444"
+                android:background="@drawable/key_background"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="35dp"
+                android:text="📅 Plan"
+                android:textAllCaps="false"
+                android:textColor="#444"
+                android:background="@drawable/key_background"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="35dp"
+                android:text="Typira Suggestion..."
+                android:textAllCaps="false"
+                android:textColor="#444"
+                android:background="@drawable/key_background"
+                android:layout_marginEnd="8dp"/>
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Main Keyboard Area -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="4dp">
+
+        <!-- Row 1: QWERTYUIOP -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="3dp"
+            android:weightSum="10">
+            
+            <Button android:id="@+id/key_q" style="@style/KeyboardKey" android:text="q" />
+            <Button android:id="@+id/key_w" style="@style/KeyboardKey" android:text="w" />
+            <Button android:id="@+id/key_e" style="@style/KeyboardKey" android:text="e" />
+            <Button android:id="@+id/key_r" style="@style/KeyboardKey" android:text="r" />
+            <Button android:id="@+id/key_t" style="@style/KeyboardKey" android:text="t" />
+            <Button android:id="@+id/key_y" style="@style/KeyboardKey" android:text="y" />
+            <Button android:id="@+id/key_u" style="@style/KeyboardKey" android:text="u" />
+            <Button android:id="@+id/key_i" style="@style/KeyboardKey" android:text="i" />
+            <Button android:id="@+id/key_o" style="@style/KeyboardKey" android:text="o" />
+            <Button android:id="@+id/key_p" style="@style/KeyboardKey" android:text="p" />
+        </LinearLayout>
+
+        <!-- Row 2: ASDFGHJKL -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="18dp"
+            android:weightSum="9"> 
+
+            <Button android:id="@+id/key_a" style="@style/KeyboardKey" android:text="a" />
+            <Button android:id="@+id/key_s" style="@style/KeyboardKey" android:text="s" />
+            <Button android:id="@+id/key_d" style="@style/KeyboardKey" android:text="d" />
+            <Button android:id="@+id/key_f" style="@style/KeyboardKey" android:text="f" />
+            <Button android:id="@+id/key_g" style="@style/KeyboardKey" android:text="g" />
+            <Button android:id="@+id/key_h" style="@style/KeyboardKey" android:text="h" />
+            <Button android:id="@+id/key_j" style="@style/KeyboardKey" android:text="j" />
+            <Button android:id="@+id/key_k" style="@style/KeyboardKey" android:text="k" />
+            <Button android:id="@+id/key_l" style="@style/KeyboardKey" android:text="l" />
+        </LinearLayout>
+
+        <!-- Row 3: Shift, ZXCVBNM, Backspace -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="3dp"
+            android:weightSum="10"> 
+
+            <ImageButton 
+                android:id="@+id/key_shift" 
+                style="@style/KeyboardKeySpecial" 
+                android:src="@drawable/ic_shift"
+                android:scaleType="centerInside"
+                android:padding="12dp"
+                android:contentDescription="Shift"
+                android:layout_weight="1.5" />
+            
+            <Button android:id="@+id/key_z" style="@style/KeyboardKey" android:text="z" />
+            <Button android:id="@+id/key_x" style="@style/KeyboardKey" android:text="x" />
+            <Button android:id="@+id/key_c" style="@style/KeyboardKey" android:text="c" />
+            <Button android:id="@+id/key_v" style="@style/KeyboardKey" android:text="v" />
+            <Button android:id="@+id/key_b" style="@style/KeyboardKey" android:text="b" />
+            <Button android:id="@+id/key_n" style="@style/KeyboardKey" android:text="n" />
+            <Button android:id="@+id/key_m" style="@style/KeyboardKey" android:text="m" />
+            
+            <ImageButton 
+                android:id="@+id/key_backspace" 
+                style="@style/KeyboardKeySpecial" 
+                android:src="@drawable/ic_backspace"
+                android:scaleType="centerInside"
+                android:padding="12dp"
+                android:contentDescription="Backspace"
+                android:layout_weight="1.5"/>
+        </LinearLayout>
+        
+        <!-- Row 4: 123, Emoji, Space, Return -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="3dp"
+            android:weightSum="10">
+
+            <Button android:id="@+id/key_mode" style="@style/KeyboardKeySpecial" android:text="\?123" android:textSize="14sp" android:layout_weight="1.5" />
+            
+            <ImageButton 
+                android:id="@+id/key_emoji" 
+                style="@style/KeyboardKeySpecial" 
+                android:src="@drawable/ic_emoji"
+                android:scaleType="centerInside"
+                android:padding="10dp"
+                android:contentDescription="Emoji"
+                android:layout_weight="1.5" />
+                
+            <Button android:id="@+id/key_space" style="@style/KeyboardKey" android:text="" android:layout_weight="5" />
+            <Button android:id="@+id/key_enter" style="@style/KeyboardKeySpecial" android:text="Go" android:textSize="14sp" android:layout_weight="2" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>
