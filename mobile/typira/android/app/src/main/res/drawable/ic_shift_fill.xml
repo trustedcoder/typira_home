@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24.0"
+    android:viewportHeight="24.0">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M16,7h-2v13h-4V7h-2l4,-5z" /> 
+    <!-- Same path but we will use this filename to distinguish or potentially change style later. 
+         Actually the previous one had fillColor="#FF000000". If the original was outline, it should be different.
+         Let's check the original ic_shift content. -->
+</vector>

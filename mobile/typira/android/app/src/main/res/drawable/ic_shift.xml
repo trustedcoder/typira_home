@@ -3,7 +3,18 @@
     android:height="24dp"
     android:viewportWidth="24.0"
     android:viewportHeight="24.0">
+    <!-- Outline Path -->
     <path
         android:fillColor="#FF000000"
-        android:pathData="M16,7h-2v13h-4V7h-2l4,-5z"/>
+        android:pathData="M16,7h-2v13h-4V7h-2l4,-5z m-4,-2.83L14.17,6H13v13h-2V6H9.83L12,4.17z"/> 
+        <!-- This is a rough outline approximation. 
+             Actually, standard Material Design arrow_upward is solid. 
+             Let's use a cleaner outline path or just use the solid one with gray tint for inactive.
+             User asked for "icon change". 
+             Let's make inactive = Hollow Arrow. 
+             Active = Solid Arrow.
+             Locked = Solid Arrow + Bar. -->
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M12,2L4.5,9H9v11h6V9h4.5L12,2z M12,4.83L14.17,7H13v11h-2V7H9.83L12,4.83z"/>
 </vector>

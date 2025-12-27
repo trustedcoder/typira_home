@@ -5,7 +5,7 @@
 - [x] **Project Init**: Initialize iOS Keyboard Extension and Android InputMethodService.
 - [ ] **Layout Engine**:
     - [x] Design and implement QWERTY Keys layout (XML/SwiftUI/Jetpack Compose).
-    - [ ] Implement Shift/Caps Lock logic.
+    - [x] Implement Shift/Caps Lock logic.
     - [ ] Implement Symbol/Numeric layer switching.
 - [ ] **Input Handling**:
     - [ ] Handle key presses and commit text to InputConnection/TextDocumentProxy.
