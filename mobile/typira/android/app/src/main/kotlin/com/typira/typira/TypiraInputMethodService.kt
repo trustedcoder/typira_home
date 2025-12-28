@@ -76,6 +76,12 @@ class TypiraInputMethodService : InputMethodService() {
         val rememberBtn = rootView.findViewById<Button>(R.id.btn_remember)
         rememberBtn?.setOnClickListener { handleRememberAction() }
 
+        val micBtn = rootView.findViewById<Button>(R.id.btn_mic)
+        micBtn?.setOnClickListener { handleMicAction() }
+
+        val listenBtn = rootView.findViewById<Button>(R.id.btn_listen)
+        listenBtn?.setOnClickListener { handleListenAction() }
+
         letterButtons.clear()
         findLetterKeys(rootView)
         
@@ -353,5 +359,15 @@ class TypiraInputMethodService : InputMethodService() {
         val memories = prefs.getStringSet("memories", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
         memories.add(text)
         prefs.edit().putStringSet("memories", memories).apply()
+    }
+
+    private fun handleMicAction() {
+        // TODO: Implement streaming to Flutter -> Gemini STT
+        Toast.makeText(this, "🎙️ Listening...", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun handleListenAction() {
+        // TODO: Implement Flutter -> Gemini TTS -> Playback
+        Toast.makeText(this, "🔊 Reading aloud...", Toast.LENGTH_SHORT).show()
     }
 }

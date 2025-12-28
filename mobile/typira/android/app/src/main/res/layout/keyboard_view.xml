@@ -52,6 +52,28 @@
                 android:layout_marginEnd="8dp"/>
 
             <Button
+                android:id="@+id/btn_mic"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="35dp"
+                android:text="🎙️"
+                android:textAllCaps="false"
+                android:textColor="#444"
+                android:background="@drawable/key_background"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
+                android:id="@+id/btn_listen"
+                style="?android:attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="35dp"
+                android:text="🔊 Listen"
+                android:textAllCaps="false"
+                android:textColor="#444"
+                android:background="@drawable/key_background"
+                android:layout_marginEnd="8dp"/>
+
+            <Button
                 style="?android:attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="35dp"

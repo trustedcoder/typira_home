@@ -20,13 +20,16 @@
     - [x] Implement Emoji parsing and display grid.
     - [x] Handle emoji selection and insertion.
 
-### 2. Voice Input (Mobile)
-- [ ] **Permissions**: Request Microphone access properly.
-- [ ] **Dictation UI**: Create a wave/visualizer overlay/state.
-- [ ] **Speech-to-Text**:
-    - [ ] Integrate Android SpeechRecognizer.
-    - [ ] Integrate iOS SFSpeechRecognizer.
-- [ ] **Command Mode**: Implement keywords detection (locally) for "Remind me" vs raw value.
+### 2. AI Voice Input (Gemini-Powered)
+- [/] **Mic Button**: Add Microphone icon to the keyboard toolbar.
+- [ ] **Streaming Audio**: Implement audio capturing and streaming from Native to Backend.
+- [ ] **Gemini STT**: Integrate Gemini API on the backend to transcribe audio.
+- [ ] **Auto-Insert**: Automatically insert transcribed text into the current field.
+
+### 3. AI Read-Aloud (Gemini TTS)
+- [/] **🔊 Listen Action**: Add a listen button next to AI suggestions.
+- [ ] **Gemini TTS**: Use Gemini/Cloud TTS to generate audio for suggestions.
+- [ ] **Audio Playback**: Implement high-quality playback on the mobile device.
 
 ## Category B: Local Understanding (Privacy-First)
 ### 3. Local Emotion Signal Engine (Mobile)

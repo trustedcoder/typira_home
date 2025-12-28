@@ -25,6 +25,15 @@
 - **Virtual Env**: Assume a virtual environment is active.
 - **Modern Python**: Use modern Python 3.10+ features (e.g., match statements, union types `|`).
 
+# Hybrid Architecture Policy (Keyboard)
+- **Native for Core Input**: The keyboard's core rendering, input handling (QWERTY, Symbols, Emoji board), and performance-critical gestures (Spacebar trackpad) MUST remain native (Swift for iOS, Kotlin for Android). This is to respect strict memory limits and ensure zero-latency typing.
+- **Flutter for Intelligence & UI**: All "Intelligence" features (AI Memory management, Dashboard, Goal tracking, Settings, Backend connectivity) MUST be built in Flutter.
+- **Bridging**: Use `MethodChannel` (Android) and `FlutterMethodChannel` (iOS) to communicate between the native keyboard extension/service and the Flutter engine.
+- **Memory Conservation**: Be extremely cautious with resource usage in the Native Keyboard layer. Avoid loading large assets or background processes that could exceed iOS keyboard memory limits.
+
 # Project Structure specific
 - `backend_api/`: Python backend code.
-- `mobile/`: Flutter mobile application.
+- `mobile//typira/`: Main project directory.
+- `mobile//typira/android/`: Native Android keyboard implementation (InputMethodService).
+- `mobile//typira/ios/`: Native iOS keyboard implementation (Keyboard Extension).
+- `mobile//typira/lib/`: Flutter code for Dashboard, Memory, and AI Logic.

@@ -109,19 +109,24 @@ class KeyboardViewController: UIInputViewController {
         self.view.subviews.forEach { $0.removeFromSuperview() }
         self.view.backgroundColor = UIColor(red: 209/255, green: 212/255, blue: 217/255, alpha: 1.0)
         
+        let suggestionScrollView = UIScrollView()
+        suggestionScrollView.translatesAutoresizingMaskIntoConstraints = false
+        suggestionScrollView.showsHorizontalScrollIndicator = false
+        self.view.addSubview(suggestionScrollView)
+
         let suggestionStrip = UIStackView()
         suggestionStrip.axis = .horizontal
-        suggestionStrip.distribution = .fillProportionally
+        suggestionStrip.distribution = .equalSpacing
         suggestionStrip.spacing = 10
         suggestionStrip.translatesAutoresizingMaskIntoConstraints = false
         suggestionStrip.layoutMargins = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         suggestionStrip.isLayoutMarginsRelativeArrangement = true
         
-        for title in ["✨ Rewrite", "📅 Plan", "🧠 Remember", "Reply"] {
+        for title in ["✨ Rewrite", "📅 Plan", "🧠 Remember", "🎙️", "🔊 Listen", "Reply"] {
             let btn = createChip(title: title)
             suggestionStrip.addArrangedSubview(btn)
         }
-        self.view.addSubview(suggestionStrip)
+        suggestionScrollView.addSubview(suggestionStrip)
         
         // mainStack - will contain [qwertyRowsStack OR emojiScrollView] and then row4
         let mainStack = UIStackView()
@@ -133,12 +138,18 @@ class KeyboardViewController: UIInputViewController {
         
         let safe = self.view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
-            suggestionStrip.topAnchor.constraint(equalTo: self.view.topAnchor, constant: 4),
-            suggestionStrip.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
-            suggestionStrip.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
-            suggestionStrip.heightAnchor.constraint(equalToConstant: 44),
+            suggestionScrollView.topAnchor.constraint(equalTo: self.view.topAnchor, constant: 4),
+            suggestionScrollView.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
+            suggestionScrollView.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
+            suggestionScrollView.heightAnchor.constraint(equalToConstant: 44),
             
-            mainStack.topAnchor.constraint(equalTo: suggestionStrip.bottomAnchor, constant: 4),
+            suggestionStrip.topAnchor.constraint(equalTo: suggestionScrollView.topAnchor),
+            suggestionStrip.leadingAnchor.constraint(equalTo: suggestionScrollView.leadingAnchor),
+            suggestionStrip.trailingAnchor.constraint(equalTo: suggestionScrollView.trailingAnchor),
+            suggestionStrip.bottomAnchor.constraint(equalTo: suggestionScrollView.bottomAnchor),
+            suggestionStrip.heightAnchor.constraint(equalTo: suggestionScrollView.heightAnchor),
+
+            mainStack.topAnchor.constraint(equalTo: suggestionScrollView.bottomAnchor, constant: 4),
             mainStack.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 4),
             mainStack.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -4),
             mainStack.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -4)
@@ -464,7 +475,21 @@ class KeyboardViewController: UIInputViewController {
             UIView.animate(withDuration: 1.0) {
                 sender.backgroundColor = originalColor
             }
+        } else if title == "🎙️" {
+            handleMicAction()
+        } else if title == "🔊 Listen" {
+            handleListenAction()
         }
+    }
+    
+    func handleMicAction() {
+        // TODO: Implement streaming to Flutter -> Gemini STT
+        print("🎙️ Mic tapped")
+    }
+    
+    func handleListenAction() {
+        // TODO: Implement Flutter -> Gemini TTS -> Playback
+        print("🔊 Listen tapped")
     }
     
     func handleRememberAction() {
