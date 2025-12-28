@@ -2,6 +2,7 @@ package com.typira.typira
 
 import android.inputmethodservice.InputMethodService
 import android.view.View
+import android.view.MotionEvent
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.view.KeyEvent
@@ -60,11 +61,62 @@ class TypiraInputMethodService : InputMethodService() {
 
         val space = rootView.findViewById<Button>(R.id.key_space)
         space?.setOnClickListener { onKeyClick("space") }
+        setupSpaceKeyTrackpad(space)
 
         letterButtons.clear()
         findLetterKeys(rootView)
         
         updateShiftUI() 
+    }
+
+    private fun setupSpaceKeyTrackpad(spaceKey: View?) {
+        spaceKey?.setOnTouchListener(object : View.OnTouchListener {
+            private var lastX = 0f
+            private var initialX = 0f
+            private val MOVE_THRESHOLD = 20f 
+            private var isSliding = false
+            
+            override fun onTouch(v: View, event: MotionEvent): Boolean {
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        lastX = event.x
+                        initialX = event.x
+                        isSliding = false
+                        // Don't consume yet, wait to see if it's a slide
+                        return false 
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        val deltaX = event.x - lastX
+                        if (!isSliding && Math.abs(event.x - initialX) > MOVE_THRESHOLD) {
+                             isSliding = true
+                        }
+                        
+                        if (isSliding) {
+                             if (Math.abs(deltaX) > MOVE_THRESHOLD) {
+                                  // Move Cursor
+                                  val direction = if (deltaX > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+                                  currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, direction))
+                                  currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, direction))
+                                  lastX = event.x
+                             }
+                             return true // Consume dragging
+                        }
+                        return false
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        // If it was a slide, we consumed it. If not, it falls through to click.
+                        // But wait, if we return false on DOWN, the ClickListener usually fires on UP.
+                        // We need to ensure we don't trigger click if we slid.
+                        // Since we return true during MOVE if sliding, the sequence might be interrupted for Click?
+                        // Actually, standard OnClickListener fires on UP if not consumed.
+                        // If isSliding was true, we should return true here to prevent Click.
+                        return isSliding
+                    }
+                }
+                return false
+            }
+        })
+
     }
 
     private fun findLetterKeys(view: View) {

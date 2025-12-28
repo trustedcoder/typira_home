@@ -122,6 +122,11 @@ class KeyboardViewController: UIInputViewController {
         self.modeButton?.tag = 102 // Mode Tag
         let emojiBtn = createButton(title: "☺", isSpecial: true)
         let spaceBtn = createButton(title: "space", isSpecial: false)
+        
+        // Cursor Control Gesture
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handleSpacePan(_:)))
+        spaceBtn.addGestureRecognizer(panGesture)
+        
         let returnBtn = createButton(title: "return", isSpecial: true)
         
         row4.addArrangedSubview(modeButton!)
@@ -279,6 +284,18 @@ class KeyboardViewController: UIInputViewController {
         updateShiftUI()
     }
     
+    @objc func handleSpacePan(_ gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: self.view)
+        let threshold: CGFloat = 10.0
+        
+        if abs(translation.x) > threshold {
+            let offset = translation.x > 0 ? 1 : -1
+            self.textDocumentProxy.adjustTextPosition(byCharacterOffset: offset)
+            // Reset translation to allow continuous movement
+            gesture.setTranslation(.zero, in: self.view)
+        }
+    }
+
     func updateShiftUI() {
         if isSymbols { return }
         

@@ -8,9 +8,9 @@
     - [x] Implement Shift/Caps Lock logic.
     - [x] Implement Symbol/Numeric layer switching.
 - [ ] **Input Handling**:
-    - [ ] Handle key presses and commit text to InputConnection/TextDocumentProxy.
-    - [ ] Implement deletion (Backspace) interactions.
-    - [ ] Implement Cursor movement control.
+    - [x] Handle key presses and commit text to InputConnection/TextDocumentProxy.
+    - [x] Implement deletion (Backspace) interactions.
+    - [x] Implement Cursor movement control.
 - [ ] **Clipboard Integration**:
     - [ ] Add clipboard read permission handling.
     - [ ] Create UI for clipboard history (if allowed).
