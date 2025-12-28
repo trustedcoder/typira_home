@@ -21,15 +21,17 @@
     - [x] Handle emoji selection and insertion.
 
 ### 2. AI Voice Input (Gemini-Powered)
-- [/] **Mic Button**: Add Microphone icon to the keyboard toolbar.
-- [ ] **Streaming Audio**: Implement audio capturing and streaming from Native to Backend.
-- [ ] **Gemini STT**: Integrate Gemini API on the backend to transcribe audio.
-- [ ] **Auto-Insert**: Automatically insert transcribed text into the current field.
+- [x] **Mic Button**: Add Microphone icon to the keyboard toolbar.
+- [x] **Streaming Audio**: Implement audio capturing and streaming from Native to Backend.
+    - [x] **Android**: Hybrid bridge to Flutter.
+    - [x] **iOS**: Native Swift implementation for memory safety.
+- [x] **Gemini STT**: Integrate Gemini API on the backend to transcribe audio.
+- [x] **Auto-Insert**: Automatically insert transcribed text into the current field.
 
 ### 3. AI Read-Aloud (Gemini TTS)
-- [/] **🔊 Listen Action**: Add a listen button next to AI suggestions.
-- [ ] **Gemini TTS**: Use Gemini/Cloud TTS to generate audio for suggestions.
-- [ ] **Audio Playback**: Implement high-quality playback on the mobile device.
+- [x] **🔊 Listen Action**: Add a listen button next to AI suggestions.
+- [x] **Gemini TTS**: Use Gemini/Cloud TTS to generate audio for suggestions.
+- [x] **Audio Playback**: Implement high-quality playback on the mobile device. (Native TTS fallback used for reliability)
 
 ## Category B: Local Understanding (Privacy-First)
 ### 3. Local Emotion Signal Engine (Mobile)
@@ -107,3 +109,20 @@
 ### 21. Memory System
 - [ ] **Database**: User-specific encrypted storage (e.g., PostgreSQL + Encryption).
 - [ ] **Preference API**: Endpoints to GET/UPDATE `UserStyle`.
+## Category J: Reorganized UI & Agent Hub
+### 22. Agent Hub (Mobile)
+- [ ] **Grid Navigation**:
+    - [ ] Implement Categorized Grid Layout for Agent Actions (Generation, Productivity, Insights).
+    - [ ] Integrate categorized buttons (Social Content, Article Writing, Habit Tracking, etc.).
+- [ ] **Contextual Agentic UI**:
+    - [ ] Implement "Voice View" overlay with real-time pulse animation.
+    - [ ] Implement "Smart Bubbles/Toasts" for high-priority contextual suggestions.
+- [ ] **Deep Linking**:
+    - [ ] Implement bridge to open the main Typira app for complex agentic flows.
+
+### 23. Contextual Engine (Backend)
+- [ ] **Intent Classifier**:
+    - [ ] Add `/analyze-intent` endpoint for real-time typing history analysis.
+    - [ ] Update STT and Rewrite endpoints to return `suggested_action` metadata.
+- [ ] **Notification Bridge**:
+    - [ ] Implement logic to trigger System Notifications for non-keyboard agentic tasks.

@@ -10,6 +10,17 @@ import java.util.Locale
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import android.media.AudioFormat
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import kotlin.concurrent.thread
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.dart.DartExecutor
+import io.flutter.plugin.common.MethodChannel
+import android.speech.tts.TextToSpeech
 
 class TypiraInputMethodService : InputMethodService() {
 
@@ -41,11 +52,55 @@ class TypiraInputMethodService : InputMethodService() {
     private lateinit var gridEmoji: android.widget.GridLayout
 
     private var isEmojiView = false
+    
+    private var isRecording = false
+    private var mediaRecorder: android.media.MediaRecorder? = null
+    private var currentAudioPath: String? = null
+
+    private var flutterEngine: FlutterEngine? = null
+    private var methodChannel: MethodChannel? = null
+    private val CHANNEL = "com.typira.typira/intelligence"
+    
+    private var tts: TextToSpeech? = null
 
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.keyboard_view, null)
+        setupFlutter()
+        setupTTS()
         setupKeyListeners(view)
         return view
+    }
+
+    private fun setupTTS() {
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale.US
+            }
+        }
+    }
+
+    private fun setupFlutter() {
+        if (flutterEngine == null) {
+            flutterEngine = FlutterEngine(this)
+            flutterEngine?.dartExecutor?.executeDartEntrypoint(
+                DartExecutor.DartEntrypoint.createDefault()
+            )
+            methodChannel = MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger!!, CHANNEL)
+            methodChannel?.setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "commitText" -> {
+                        val text = call.arguments as? String
+                        if (text != null) {
+                            currentInputConnection?.commitText(text, 1)
+                            result.success(true)
+                        } else {
+                            result.error("INVALID_ARGUMENT", "Text is null", null)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        }
     }
 
     private fun setupKeyListeners(rootView: View) {
@@ -72,6 +127,17 @@ class TypiraInputMethodService : InputMethodService() {
         val space = rootView.findViewById<Button>(R.id.key_space)
         space?.setOnClickListener { onKeyClick("space") }
         setupSpaceKeyTrackpad(space)
+
+        val rewriteBtn = rootView.findViewById<Button>(R.id.btn_rewrite)
+        rewriteBtn?.setOnClickListener { 
+            val currentText = currentInputConnection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString() ?: ""
+            if (currentText.isNotEmpty()) {
+                methodChannel?.invokeMethod("requestRewrite", currentText)
+                Toast.makeText(this, "✨ Rewriting...", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Type something first", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         val rememberBtn = rootView.findViewById<Button>(R.id.btn_remember)
         rememberBtn?.setOnClickListener { handleRememberAction() }
@@ -344,7 +410,8 @@ class TypiraInputMethodService : InputMethodService() {
                     return
                 }
                 
-                saveMemory(text)
+                // Bridge to Flutter for intelligence / storage
+                methodChannel?.invokeMethod("rememberText", text)
                 Toast.makeText(this, "🧠 Memory Saved", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(this, "Nothing to remember", Toast.LENGTH_SHORT).show()
@@ -362,12 +429,70 @@ class TypiraInputMethodService : InputMethodService() {
     }
 
     private fun handleMicAction() {
-        // TODO: Implement streaming to Flutter -> Gemini STT
-        Toast.makeText(this, "🎙️ Listening...", Toast.LENGTH_SHORT).show()
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Microphone permission required. Please enable in the main app.", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        if (isRecording) {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private fun startRecording() {
+        try {
+            val audioFile = java.io.File.createTempFile("typira_voice_", ".m4a", cacheDir)
+            currentAudioPath = audioFile.absolutePath
+
+            mediaRecorder = android.media.MediaRecorder()
+            mediaRecorder?.apply {
+                setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                setOutputFile(currentAudioPath)
+                prepare()
+                start()
+            }
+
+            isRecording = true
+            Toast.makeText(this, "🎙️ Listening...", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Recording failed: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun stopRecording() {
+        try {
+            isRecording = false
+            mediaRecorder?.stop()
+            mediaRecorder?.release()
+            mediaRecorder = null
+            
+            Toast.makeText(this, "🎙️ Processing...", Toast.LENGTH_SHORT).show()
+            
+            // Send file path to Flutter for processing
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                methodChannel?.invokeMethod("processVoiceFile", currentAudioPath)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error stopping record: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun handleListenAction() {
-        // TODO: Implement Flutter -> Gemini TTS -> Playback
-        Toast.makeText(this, "🔊 Reading aloud...", Toast.LENGTH_SHORT).show()
+        val currentText = currentInputConnection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString() ?: ""
+        if (currentText.isNotEmpty()) {
+            tts?.speak(currentText, TextToSpeech.QUEUE_FLUSH, null, null)
+        } else {
+            Toast.makeText(this, "Nothing to read", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        tts?.stop()
+        tts?.shutdown()
     }
 }

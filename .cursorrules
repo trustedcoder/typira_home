@@ -5,6 +5,7 @@
 - Follow "Clean Architecture" principles where applicable.
 - When editing code, always output the full file content if the file is small, or use precise search/replace blocks for larger files.
 - Commit messages should be semantic (e.g., `feat:`, `fix:`, `chore:`, `refactor:`).
+- When a task is assigned, only perform that specific task. Do not start working on other tasks without prior approval.
 
 # Flutter & Dart Rules (Path: mobile/)
 - **Strong Typing**: Always use strong types. Avoid `dynamic` unless absolutely necessary.
@@ -37,3 +38,12 @@
 - `mobile//typira/android/`: Native Android keyboard implementation (InputMethodService).
 - `mobile//typira/ios/`: Native iOS keyboard implementation (Keyboard Extension).
 - `mobile//typira/lib/`: Flutter code for Dashboard, Memory, and AI Logic.
+
+# Agent Hub & Contextual Architecture
+- **Categorization**: Agent actions must be grouped into **Generation**, **Productivity**, and **Insights**.
+- **Contextual Awareness**: The keyboard should not just be passive. Use typing history (via backend `/analyze-intent`) to proactively suggest actions.
+- **Hybrid Notification Policy**:
+  - **Inline**: Use "Smart Toasts" or "Bubbles" for immediate text-based actions.
+  - **App-Level**: Use System Notifications for complex actions that require the full Typira App (e.g., long-form article writing, goal setup).
+- **Scalability**: The Agent Hub MUST use a dynamic grid (Collection/RecyclerView) to allow adding new agentic tools (image-to-text, productivity tips, etc.) without redesigning the UI.
+

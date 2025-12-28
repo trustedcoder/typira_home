@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import AVFoundation
 
 class KeyboardViewController: UIInputViewController {
     
@@ -21,7 +22,13 @@ class KeyboardViewController: UIInputViewController {
     var shiftState: ShiftState = .off
     var isSymbols = false
     var isMoreSymbols = false
-    var isEmojiView = false
+    private var isEmojiView = false
+    
+    private var audioRecorder: AVAudioRecorder?
+    private var isRecording = false
+    private var recordingURL: URL?
+    
+    private let synthesizer = AVSpeechSynthesizer()
     
     var lastShiftPressTime: Double = 0
     let doubleTapTimeout: Double = 0.3
@@ -466,10 +473,19 @@ class KeyboardViewController: UIInputViewController {
     override func textDidChange(_ textInput: UITextInput?) {}
     @objc func didTapSuggestion(_ sender: UIButton) {
         let title = sender.title(for: .normal) ?? ""
-        if title == "🧠 Remember" {
+        if title == "✨ Rewrite" {
+            handleRewriteAction()
+            
+            // Visual feedback
+            let originalColor = sender.backgroundColor
+            sender.backgroundColor = .cyan
+            UIView.animate(withDuration: 1.0) {
+                sender.backgroundColor = originalColor
+            }
+        } else if title == "🧠 Remember" {
             handleRememberAction()
             
-            // Simple visual feedback
+            // Visual feedback
             let originalColor = sender.backgroundColor
             sender.backgroundColor = .green
             UIView.animate(withDuration: 1.0) {
@@ -483,25 +499,179 @@ class KeyboardViewController: UIInputViewController {
     }
     
     func handleMicAction() {
-        // TODO: Implement streaming to Flutter -> Gemini STT
-        print("🎙️ Mic tapped")
+        if isRecording {
+            stopRecording()
+        } else {
+            startRecording()
+        }
+    }
+    
+    func startRecording() {
+        let audioSession = AVAudioSession.sharedInstance()
+        do {
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+            try audioSession.setActive(true)
+            
+            let tempDir = FileManager.default.temporaryDirectory
+            recordingURL = tempDir.appendingPathComponent("typira_voice.m4a")
+            
+            let settings: [String: Any] = [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 16000,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+            ]
+            
+            audioRecorder = try AVAudioRecorder(url: recordingURL!, settings: settings)
+            audioRecorder?.prepareToRecord()
+            audioRecorder?.record()
+            
+            isRecording = true
+            print("🎙️ iOS Native Recording started: \(recordingURL?.path ?? "")")
+            
+        } catch {
+            print("Failed to start recording: \(error.localizedDescription)")
+        }
+    }
+    
+    func stopRecording() {
+        isRecording = false
+        audioRecorder?.stop()
+        print("🎙️ iOS Native Recording stopped. Uploading...")
+        
+        if let url = recordingURL {
+            uploadAudio(at: url)
+        }
+    }
+
+    func uploadAudio(at url: URL) {
+        let backendURL = URL(string: "http://localhost:8000/stt")!
+        var request = URLRequest(url: backendURL)
+        request.httpMethod = "POST"
+        
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"audio_file\"; filename=\"voice.m4a\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: audio/m4a\r\n\r\n".data(using: .utf8)!)
+        
+        do {
+            let audioData = try Data(contentsOf: url)
+            body.append(audioData)
+            body.append("\r\n".data(using: .utf8)!)
+            body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            request.httpBody = body
+            
+            URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+                if let error = error {
+                    print("Upload failed: \(error.localizedDescription)")
+                    return
+                }
+                
+                if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let transcript = json["transcript"] as? String {
+                    DispatchQueue.main.async {
+                        self?.textDocumentProxy.insertText(transcript)
+                        print("✅ iOS Voice Inserted: \(transcript)")
+                    }
+                }
+            }.resume()
+            
+        } catch {
+            print("Failed to read audio data: \(error.localizedDescription)")
+        }
     }
     
     func handleListenAction() {
-        // TODO: Implement Flutter -> Gemini TTS -> Playback
-        print("🔊 Listen tapped")
+        // Read text from the proxy
+        let text = textDocumentProxy.documentContextBeforeInput ?? ""
+        if text.isEmpty { return }
+        
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        utterance.rate = 0.5
+        
+        if synthesizer.isSpeaking {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
+        synthesizer.speak(utterance)
+        print("🔊 iOS Native TTS Speaking: \(text)")
     }
     
     func handleRememberAction() {
         if let text = UIPasteboard.general.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if text.count < 3 { return }
             
+            // Local store
             let prefs = UserDefaults.standard
             var memories = prefs.stringArray(forKey: "typira_memories") ?? []
             if !memories.contains(text) {
                 memories.append(text)
                 prefs.set(memories, forKey: "typira_memories")
             }
+            
+            // Sync to Backend
+            syncMemoryToBackend(text: text)
         }
+    }
+    
+    func handleRewriteAction() {
+        let text = textDocumentProxy.documentContextBeforeInput ?? ""
+        if text.isEmpty { return }
+        
+        // Fetch memories for context
+        let prefs = UserDefaults.standard
+        let memories = prefs.stringArray(forKey: "typira_memories") ?? []
+        let context = memories.joined(separator: ". ")
+        
+        requestRewrite(text: text, context: context)
+    }
+    
+    func requestRewrite(text: String, context: String) {
+        guard let url = URL(string: "http://localhost:8000/rewrite") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let bodyParameters = [
+            "text": text,
+            "context": context,
+            "tone": "professional"
+        ]
+        
+        let bodyString = bodyParameters.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }.joined(separator: "&")
+        request.httpBody = bodyString.data(using: .utf8)
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let rewritten = json["rewritten_text"] as? String {
+                DispatchQueue.main.async {
+                    // Replace the existing text? Or just append?
+                    // For AI, we usually replace the sentence or just insert.
+                    self?.textDocumentProxy.insertText("\n" + rewritten)
+                    print("✅ iOS Rewrite Complete")
+                }
+            }
+        }.resume()
+    }
+    
+    func syncMemoryToBackend(text: String) {
+        guard let url = URL(string: "http://localhost:8000/remember") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let body = "text=\(text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        request.httpBody = body.data(using: .utf8)
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Failed to sync memory: \(error.localizedDescription)")
+            } else {
+                print("✅ Memory synced to backend")
+            }
+        }.resume()
     }
 }

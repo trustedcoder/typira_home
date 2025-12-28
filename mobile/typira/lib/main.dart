@@ -1,122 +1,170 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:dio/dio.dart' as dio;
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  await GetStorage.init();
+  runApp(const TypiraIntelligenceApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class TypiraController extends GetxController {
+  static const platform = MethodChannel('com.typira.typira/intelligence');
+  var status = "Ready".obs;
+  var memories = <String>[].obs;
+  final storage = GetStorage();
+  final _dio = dio.Dio(dio.BaseOptions(baseUrl: 'http://10.0.2.2:8000')); // Android Emulator IP
 
-  // This widget is the root of your application.
+  @override
+  void onInit() {
+    super.onInit();
+    List<dynamic>? stored = storage.read<List<dynamic>>('memories');
+    if (stored != null) {
+      memories.assignAll(stored.cast<String>());
+    }
+    
+    platform.setMethodCallHandler(_handleMethod);
+  }
+
+  Future<dynamic> _handleMethod(MethodCall call) async {
+    switch (call.method) {
+      case "processVoiceFile":
+        final String path = call.arguments;
+        return _uploadVoice(path);
+      case "rememberText":
+        final String text = call.arguments;
+        _saveMemory(text);
+        return true;
+      case "requestRewrite":
+        final String text = call.arguments;
+        return _requestRewrite(text);
+      default:
+        throw PlatformException(code: "Unimplemented", message: "Method ${call.method} not implemented");
+    }
+  }
+
+  void _saveMemory(String text) {
+    if (!memories.contains(text)) {
+      memories.add(text);
+      storage.write('memories', memories.toList());
+      status.value = "🧠 New Memory Saved";
+    }
+  }
+
+  Future<void> _requestRewrite(String text) async {
+    try {
+      status.value = "Rewriting with context...";
+      final contextString = memories.join(". ");
+      
+      final response = await _dio.post('/rewrite', data: dio.FormData.fromMap({
+        'text': text,
+        'context': contextString,
+        'tone': 'professional', // Could be dynamic
+      }));
+
+      if (response.statusCode == 200) {
+        final rewrittenText = response.data['rewritten_text'] as String;
+        status.value = "Rewrite Complete";
+        await platform.invokeMethod('commitText', rewrittenText);
+      } else {
+        status.value = "Rewrite Failed";
+      }
+    } catch (e) {
+      status.value = "AI Offline";
+      print("Rewrite error: $e");
+    }
+  }
+
+  Future<void> _uploadVoice(String path) async {
+    try {
+      status.value = "Transcribing...";
+      final formData = dio.FormData.fromMap({
+        'audio_file': await dio.MultipartFile.fromFile(path, filename: 'voice.m4a'),
+      });
+
+      final response = await _dio.post('/stt', data: formData);
+      if (response.statusCode == 200) {
+        final transcript = response.data['transcript'] as String;
+        status.value = "Voice Inserted";
+        // Commit text back to keyboard
+        await platform.invokeMethod('commitText', transcript);
+      } else {
+        status.value = "Error: ${response.statusMessage}";
+      }
+    } catch (e) {
+      status.value = "Upload Failed";
+      print("Upload error: $e");
+    }
+  }
+}
+
+class TypiraIntelligenceApp extends StatelessWidget {
+  const TypiraIntelligenceApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
+    return GetMaterialApp(
+      title: 'Typira Intelligence',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueAccent),
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: DashboardPage(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
+class DashboardPage extends StatelessWidget {
+  DashboardPage({super.key});
+  final controller = Get.put(TypiraController());
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('🧠 Typira Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            onPressed: () {
+              controller.memories.clear();
+              controller.storage.remove('memories');
+            },
+          )
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+          children: [
+            Obx(() => Card(
+              color: Colors.blue.shade50,
+              child: ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: Text('Status: ${controller.status.value}'),
+              ),
+            )),
+            const SizedBox(height: 20),
+            const Text('User Memories (Context)', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Divider(),
+            Expanded(
+              child: Obx(() => ListView.builder(
+                itemCount: controller.memories.length,
+                itemBuilder: (context, index) {
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.memory, size: 20),
+                      title: Text(controller.memories[index]),
+                    ),
+                  );
+                },
+              )),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
