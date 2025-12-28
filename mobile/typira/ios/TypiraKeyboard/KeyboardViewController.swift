@@ -21,33 +21,89 @@ class KeyboardViewController: UIInputViewController {
     var shiftState: ShiftState = .off
     var isSymbols = false
     var isMoreSymbols = false
+    var isEmojiView = false
     
     var lastShiftPressTime: Double = 0
     let doubleTapTimeout: Double = 0.3
     
-    // Key Lists
+    // UI Elements
     var letterButtons = [UIButton]()
     let qwertyChars = "qwertyuiopasdfghjklzxcvbnm"
-    // iOS Standard 123 Layout (Mapped to 26 keys)
-    // Row 1: 1 2 3 4 5 6 7 8 9 0
-    // Row 2: - / : ; ( ) $ & @ "
-    // Row 3: . , ? ! ' (Only 5 keys standard, filled last 2 with duplicate/space)
     let symbolChars = "1234567890-/:;()$&@\".,?!'  " 
-    
-    // iOS Standard #+= Layout
-    // Row 1: [ ] { } # % ^ * + =
-    // Row 2: _ \ | ~ < > € £ ¥ •
-    // Row 3: . , ? ! ' 
     let extraSymbolChars = "[]{}#%^*+=_\\|~<>€£¥•.,?!'  "
     
+    var qwertyRowsStack: UIStackView?
+    var emojiScrollView: UIScrollView?
+    var emojiButton: UIButton?
     var shiftButton: UIButton?
     var modeButton: UIButton?
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupKeyboardLayout()
     }
-    
+
+    func toggleEmojiView() {
+        isEmojiView = !isEmojiView
+        if isEmojiView {
+            qwertyRowsStack?.isHidden = true
+            emojiScrollView?.isHidden = false
+            emojiButton?.setTitle("ABC", for: .normal)
+        } else {
+            qwertyRowsStack?.isHidden = false
+            emojiScrollView?.isHidden = true
+            emojiButton?.setTitle("☺", for: .normal)
+        }
+        self.view.layoutIfNeeded()
+    }
+
+    func populateEmojis(in stack: UIStackView) {
+        let emojiGroups: [[String]] = [
+            ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗"],
+            ["🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "🥵", "🥶", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾"],
+            ["🤲", "👐", "🙌", "👏", "🤝", "👍", "👎", "👊", "✊", "🤛", "🤜", "🤞", "✌️", "🤟", "🤘", "👌", "👈", "👉", "👆", "👇", "☝️", "✋", "🤚", "🖐", "🖖", "👋", "🤙", "💪", "🖕", "✍️", "🙏", "💍", "💄", "💋", "👄", "👅", "👂", "👃", "👣", "👁", "👀", "🧠", "🗣", "👤", "👥"],
+            ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷", "🕸", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐩", "🦮", "🐕‍🦺", "🐈", "🐓", "🦃", "🦚", "🦜", "🦢", "🦩", "🕊", "🐇", "🦝", "🦨", "🦡", "🦦", "🦥", "🐁", "🐀", "🐿", "🦔", "🐾", "🐉", "🐲", "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "☘️", "🍀", "🎍", "🎋", "🍃", "🍂", "🍁", "🍄", "🐚", "🌾", "💐", "🌷", "🌹", "🥀", "🌺", "🌸", "🌼", "🌻", "🌞", "🌝", "🌛", "🌜", "🌚", "🌕", "🌖", "🌗", "🌘", "🌑", "🌒", "🌓", "🌔", "🌙", "🌎", "🌍", "🌏", "🪐", "💫", "⭐️", "🌟", "✨", "⚡️", "☄️", "💥", "🔥", "🌪", "🌈", "☀️", "🌤", "⛅️", "🌥", "☁️", "🌦", "🌧", "⛈", "🌩", "🌨", "❄️", "☃️", "⛄️", "🌬", "💨", "💧", "💦", "☔️", "☂️", "🌊", "🌫"]
+        ]
+        
+        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        for group in emojiGroups {
+            var row = UIStackView()
+            row.axis = .horizontal
+            row.distribution = .fillEqually
+            row.spacing = 4
+            
+            for (index, emoji) in group.enumerated() {
+                let btn = UIButton(type: .system)
+                btn.setTitle(emoji, for: .normal)
+                btn.titleLabel?.font = UIFont.systemFont(ofSize: 32)
+                btn.addTarget(self, action: #selector(didTapKey(_:)), for: .touchUpInside)
+                row.addArrangedSubview(btn)
+                
+                // Add a row every 8 emojis
+                if (index + 1) % 8 == 0 {
+                    stack.addArrangedSubview(row)
+                    row = UIStackView()
+                    row.axis = .horizontal
+                    row.distribution = .fillEqually
+                    row.spacing = 4
+                }
+            }
+            // Add remaining emojis in the group
+            if !row.arrangedSubviews.isEmpty {
+                // Pad the row to maintain alignment
+                while row.arrangedSubviews.count < 8 {
+                    row.addArrangedSubview(UIView())
+                }
+                stack.addArrangedSubview(row)
+            }
+            
+            // Add a spacer between groups
+            let spacer = UIView()
+            spacer.heightAnchor.constraint(equalToConstant: 20).isActive = true
+            stack.addArrangedSubview(spacer)
+        }
+    }
     func setupKeyboardLayout() {
         letterButtons.removeAll()
         self.view.subviews.forEach { $0.removeFromSuperview() }
@@ -67,9 +123,10 @@ class KeyboardViewController: UIInputViewController {
         }
         self.view.addSubview(suggestionStrip)
         
+        // mainStack - will contain [qwertyRowsStack OR emojiScrollView] and then row4
         let mainStack = UIStackView()
         mainStack.axis = .vertical
-        mainStack.distribution = .fillEqually
+        mainStack.distribution = .fill 
         mainStack.spacing = 10 
         mainStack.translatesAutoresizingMaskIntoConstraints = false
         self.view.addSubview(mainStack)
@@ -87,10 +144,15 @@ class KeyboardViewController: UIInputViewController {
             mainStack.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -4)
         ])
         
-        mainStack.addArrangedSubview(createRow(keys: ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]))
-        mainStack.addArrangedSubview(createRow(keys: ["a", "s", "d", "f", "g", "h", "j", "k", "l"], sidePadding: 20))
+        // --- QWERTY ROWS (Rows 1-3) ---
+        qwertyRowsStack = UIStackView()
+        qwertyRowsStack?.axis = .vertical
+        qwertyRowsStack?.distribution = .fillEqually
+        qwertyRowsStack?.spacing = 10
         
-        // Row 3 (Shift)
+        qwertyRowsStack?.addArrangedSubview(createRow(keys: ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]))
+        qwertyRowsStack?.addArrangedSubview(createRow(keys: ["a", "s", "d", "f", "g", "h", "j", "k", "l"], sidePadding: 20))
+        
         let row3 = UIStackView()
         row3.axis = .horizontal
         row3.spacing = 6
@@ -110,9 +172,39 @@ class KeyboardViewController: UIInputViewController {
             shiftButton!.widthAnchor.constraint(equalTo: backBtn.widthAnchor),
             shiftButton!.widthAnchor.constraint(equalToConstant: 42)
         ])
-        mainStack.addArrangedSubview(row3)
+        qwertyRowsStack?.addArrangedSubview(row3)
         
-        // Row 4
+        mainStack.addArrangedSubview(qwertyRowsStack!)
+        // Ensure qwertyRowsStack also has a fixed height or similar to prevent jitter
+        qwertyRowsStack?.heightAnchor.constraint(equalToConstant: 220).isActive = true
+
+        // --- EMOJI SCROLL VIEW ---
+        emojiScrollView = UIScrollView()
+        emojiScrollView?.isHidden = true
+        emojiScrollView?.translatesAutoresizingMaskIntoConstraints = false
+        // Important: give it a background color so we can see it during debug if empty
+        emojiScrollView?.backgroundColor = .clear 
+        
+        let emojiStack = UIStackView()
+        emojiStack.axis = .vertical
+        emojiStack.spacing = 12
+        emojiStack.translatesAutoresizingMaskIntoConstraints = false
+        emojiScrollView?.addSubview(emojiStack)
+        
+        NSLayoutConstraint.activate([
+            emojiStack.topAnchor.constraint(equalTo: emojiScrollView!.topAnchor, constant: 8),
+            emojiStack.leadingAnchor.constraint(equalTo: emojiScrollView!.leadingAnchor, constant: 4),
+            emojiStack.trailingAnchor.constraint(equalTo: emojiScrollView!.trailingAnchor, constant: -4),
+            emojiStack.bottomAnchor.constraint(equalTo: emojiScrollView!.bottomAnchor, constant: -8),
+            emojiStack.widthAnchor.constraint(equalTo: emojiScrollView!.widthAnchor, constant: -8),
+            // Give the scroll view a height constraint so it doesn't collapse in the stack view
+            emojiScrollView!.heightAnchor.constraint(equalToConstant: 220)
+        ])
+        
+        populateEmojis(in: emojiStack)
+        mainStack.addArrangedSubview(emojiScrollView!)
+        
+        // --- ROW 4 (Always visible) ---
         let row4 = UIStackView()
         row4.axis = .horizontal
         row4.spacing = 6
@@ -120,7 +212,8 @@ class KeyboardViewController: UIInputViewController {
         
         self.modeButton = createButton(title: "123", isSpecial: true)
         self.modeButton?.tag = 102 // Mode Tag
-        let emojiBtn = createButton(title: "☺", isSpecial: true)
+        self.emojiButton = createButton(title: "☺", isSpecial: true)
+        self.emojiButton?.tag = 103 // Emoji Tag
         let spaceBtn = createButton(title: "space", isSpecial: false)
         
         // Cursor Control Gesture
@@ -130,18 +223,20 @@ class KeyboardViewController: UIInputViewController {
         let returnBtn = createButton(title: "return", isSpecial: true)
         
         row4.addArrangedSubview(modeButton!)
-        row4.addArrangedSubview(emojiBtn)
+        row4.addArrangedSubview(emojiButton!)
         row4.addArrangedSubview(spaceBtn)
         row4.addArrangedSubview(returnBtn)
         
         NSLayoutConstraint.activate([
-            modeButton!.widthAnchor.constraint(equalTo: emojiBtn.widthAnchor),
-            spaceBtn.widthAnchor.constraint(greaterThanOrEqualTo: emojiBtn.widthAnchor, multiplier: 4),
-            returnBtn.widthAnchor.constraint(equalTo: emojiBtn.widthAnchor, multiplier: 1.5)
+            modeButton!.widthAnchor.constraint(equalTo: emojiButton!.widthAnchor),
+            spaceBtn.widthAnchor.constraint(greaterThanOrEqualTo: emojiButton!.widthAnchor, multiplier: 4),
+            returnBtn.widthAnchor.constraint(equalTo: emojiButton!.widthAnchor, multiplier: 1.5),
+            row4.heightAnchor.constraint(equalToConstant: 50) // Fix row4 height
         ])
         mainStack.addArrangedSubview(row4)
         
         updateShiftUI()
+        self.view.layoutIfNeeded()
     }
     
     func createChip(title: String) -> UIButton {
@@ -185,7 +280,7 @@ class KeyboardViewController: UIInputViewController {
              // FIX: Only add to letterButtons if it's one of the 26 QWERTY keys.
              // We can check if the title is a single letter (a-z).
              // 'space' has length 5, so it won't be added.
-             if title.count == 1 {
+            if !isSpecial && title.count == 1 {
                  letterButtons.append(button)
              }
         }
@@ -214,12 +309,16 @@ class KeyboardViewController: UIInputViewController {
             toggleSymbols()
             return
         }
+
+        if sender.tag == 103 { // Emoji Tag
+            toggleEmojiView()
+            return
+        }
         
         switch title {
         case "space": proxy.insertText(" ")
         case "⌫": proxy.deleteBackward()
         case "return": proxy.insertText("\n")
-        case "☺": break
         default:
             // Prevent accidentally typing control labels if logic fails
             if title == "123" || title == "ABC" || title == "#+=" || title == "Shift" {
@@ -236,6 +335,7 @@ class KeyboardViewController: UIInputViewController {
     }
     
     func toggleSymbols() {
+        if isEmojiView { toggleEmojiView() }
         isSymbols = !isSymbols
         isMoreSymbols = false // Reset
         
@@ -251,6 +351,7 @@ class KeyboardViewController: UIInputViewController {
     }
     
     func handleShiftTap() {
+        if isEmojiView { toggleEmojiView() }
         if isSymbols {
              // Toggle More Symbols
              isMoreSymbols = !isMoreSymbols

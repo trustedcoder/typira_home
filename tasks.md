@@ -14,9 +14,9 @@
 - [ ] **Clipboard Integration**:
     - [ ] Add clipboard read permission handling.
     - [ ] Create UI for clipboard history (if allowed).
-- [ ] **Emoji Board**:
-    - [ ] Implement Emoji parsing and display grid.
-    - [ ] Handle emoji selection and insertion.
+- [x] **Emoji Board**:
+    - [x] Implement Emoji parsing and display grid.
+    - [x] Handle emoji selection and insertion.
 
 ### 2. Voice Input (Mobile)
 - [ ] **Permissions**: Request Microphone access properly.

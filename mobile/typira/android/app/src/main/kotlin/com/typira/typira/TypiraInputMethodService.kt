@@ -32,6 +32,12 @@ class TypiraInputMethodService : InputMethodService() {
 
     private lateinit var shiftButton: Button
     private lateinit var modeButton: Button
+    private lateinit var emojiButton: Button
+    private lateinit var layoutQwerty: View
+    private lateinit var layoutEmoji: View
+    private lateinit var gridEmoji: android.widget.GridLayout
+
+    private var isEmojiView = false
 
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.keyboard_view, null)
@@ -40,18 +46,19 @@ class TypiraInputMethodService : InputMethodService() {
     }
 
     private fun setupKeyListeners(rootView: View) {
+        layoutQwerty = rootView.findViewById(R.id.layout_qwerty)
+        layoutEmoji = rootView.findViewById(R.id.layout_emoji)
+        gridEmoji = rootView.findViewById(R.id.grid_emoji)
+
         // Now using Button for backspace
         val backspace = rootView.findViewById<Button>(R.id.key_backspace)
         backspace?.setOnClickListener { onKeyClick("⌫") }
-        // Set icon for backspace initially? Or text. Using text "⌫" or drawable.
-        // In XML we set text "⌫", but let's use the drawable if better.
-        // For now, text is fine.
 
         shiftButton = rootView.findViewById<Button>(R.id.key_shift)
         shiftButton.setOnClickListener { handleShiftClick() }
 
-        val emoji = rootView.findViewById<Button>(R.id.key_emoji)
-        emoji?.setOnClickListener { onKeyClick("☺") }
+        emojiButton = rootView.findViewById<Button>(R.id.key_emoji)
+        emojiButton.setOnClickListener { toggleEmojiView() }
 
         val enter = rootView.findViewById<Button>(R.id.key_enter)
         enter?.setOnClickListener { onKeyClick("return") }
@@ -67,6 +74,48 @@ class TypiraInputMethodService : InputMethodService() {
         findLetterKeys(rootView)
         
         updateShiftUI() 
+        populateEmojiGrid()
+    }
+
+    private fun toggleEmojiView() {
+        isEmojiView = !isEmojiView
+        if (isEmojiView) {
+            layoutQwerty.visibility = View.GONE
+            layoutEmoji.visibility = View.VISIBLE
+            emojiButton.text = "ABC"
+        } else {
+            layoutQwerty.visibility = View.VISIBLE
+            layoutEmoji.visibility = View.GONE
+            emojiButton.text = "☺"
+        }
+    }
+
+    private fun populateEmojiGrid() {
+        val emojiGroups = listOf(
+            listOf("😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗"),
+            listOf("🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "🥵", "🥶", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾"),
+            listOf("🤲", "👐", "🙌", "👏", "🤝", "👍", "👎", "👊", "✊", "🤛", "🤜", "🤞", "✌️", "🤟", "🤘", "👌", "👈", "👉", "👆", "👇", "☝️", "✋", "🤚", "🖐", "🖖", "👋", "🤙", "💪", "🖕", "✍️", "🙏", "💍", "💄", "💋", "👄", "👅", "👂", "👃", "👣", "👁", "👀", "🧠", "🗣", "👤", "👥"),
+            listOf("🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷", "🕸", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐩", "🦮", "🐕‍🦺", "🐈", "🐓", "🦃", "🦚", "🦜", "🦢", "🦩", "🕊", "🐇", "🦝", "🦨", "🦡", "🦦", "🦥", "🐁", "🐀", "🐿", "🦔", "🐾", "🐉", "🐲", "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "☘️", "🍀", "🎍", "🎋", "🍃", "🍂", "🍁", "🍄", "🐚", "🌾", "💐", "🌷", "🌹", "🥀", "🌺", "🌸", "🌼", "🌻", "🌞", "🌝", "🌛", "🌜", "🌚", "🌕", "🌖", "🌗", "🌘", "🌑", "🌒", "🌓", "🌔", "🌙", "🌎", "🌍", "🌏", "🪐", "💫", "⭐️", "🌟", "✨", "⚡️", "☄️", "💥", "🔥", "🌪", "🌈", "☀️", "🌤", "⛅️", "🌥", "☁️", "🌦", "🌧", "⛈", "🌩", "🌨", "❄️", "☃️", "⛄️", "🌬", "💨", "💧", "💦", "☔️", "☂️", "🌊", "🌫")
+        )
+
+        gridEmoji.removeAllViews()
+        for (group in emojiGroups) {
+            for (emoji in group) {
+                val btn = Button(this, null, 0, R.style.KeyboardKey)
+                btn.text = emoji
+                btn.textSize = 28f
+                btn.setPadding(0, 0, 0, 0)
+                val params = android.widget.GridLayout.LayoutParams()
+                params.width = 0
+                params.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                params.columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
+                btn.layoutParams = params
+                btn.setOnClickListener { onKeyClick(emoji) }
+                gridEmoji.addView(btn)
+            }
+            // Optional: spacer behavior would need a different view types in GridLayout or nested layouts.
+            // For now, consistent grid is fine.
+        }
     }
 
     private fun setupSpaceKeyTrackpad(spaceKey: View?) {
@@ -138,6 +187,7 @@ class TypiraInputMethodService : InputMethodService() {
     }
 
     private fun handleShiftClick() {
+        if (isEmojiView) toggleEmojiView()
         // If in Symbols mode, this button acts as "More Symbols" (#+=)
         if (isSymbols) {
             isMoreSymbols = !isMoreSymbols
@@ -173,6 +223,7 @@ class TypiraInputMethodService : InputMethodService() {
     }
     
     private fun toggleSymbols() {
+        if (isEmojiView) toggleEmojiView()
         isSymbols = !isSymbols
         isMoreSymbols = false // Reset extra layer
         
@@ -261,6 +312,10 @@ class TypiraInputMethodService : InputMethodService() {
         shiftState = ShiftState.OFF
         isSymbols = false
         isMoreSymbols = false
+        isEmojiView = false
+        if (this::layoutQwerty.isInitialized) layoutQwerty.visibility = View.VISIBLE
+        if (this::layoutEmoji.isInitialized) layoutEmoji.visibility = View.GONE
+        if (this::emojiButton.isInitialized) emojiButton.text = "☺"
         if (this::modeButton.isInitialized) modeButton.text = "?123"
         if (this::shiftButton.isInitialized) updateShiftUI()
     }
