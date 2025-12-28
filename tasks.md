@@ -11,9 +11,11 @@
     - [x] Handle key presses and commit text to InputConnection/TextDocumentProxy.
     - [x] Implement deletion (Backspace) interactions.
     - [x] Implement Cursor movement control.
-- [ ] **Clipboard Integration**:
-    - [ ] Add clipboard read permission handling.
-    - [ ] Create UI for clipboard history (if allowed).
+- [x] **AI Context Memory (Selective Ingestion)**:
+    - [x] Implement "Feed to AI" action in keyboard UI.
+    - [x] Handle clipboard access level permissions.
+    - [x] Implement local or backend storage for user "memories".
+    - [x] Integrate stored memories into Gemini prompt context (RAG).
 - [x] **Emoji Board**:
     - [x] Implement Emoji parsing and display grid.
     - [x] Handle emoji selection and insertion.

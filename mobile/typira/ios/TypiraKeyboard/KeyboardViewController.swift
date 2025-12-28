@@ -117,7 +117,7 @@ class KeyboardViewController: UIInputViewController {
         suggestionStrip.layoutMargins = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         suggestionStrip.isLayoutMarginsRelativeArrangement = true
         
-        for title in ["✨ Rewrite", "📅 Plan", "Reply"] {
+        for title in ["✨ Rewrite", "📅 Plan", "🧠 Remember", "Reply"] {
             let btn = createChip(title: title)
             suggestionStrip.addArrangedSubview(btn)
         }
@@ -246,6 +246,7 @@ class KeyboardViewController: UIInputViewController {
         btn.layer.cornerRadius = 14
         btn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         btn.setTitleColor(.black, for: .normal)
+        btn.addTarget(self, action: #selector(didTapSuggestion(_:)), for: .touchUpInside)
         return btn
     }
     
@@ -452,4 +453,30 @@ class KeyboardViewController: UIInputViewController {
 
     override func textWillChange(_ textInput: UITextInput?) {}
     override func textDidChange(_ textInput: UITextInput?) {}
+    @objc func didTapSuggestion(_ sender: UIButton) {
+        let title = sender.title(for: .normal) ?? ""
+        if title == "🧠 Remember" {
+            handleRememberAction()
+            
+            // Simple visual feedback
+            let originalColor = sender.backgroundColor
+            sender.backgroundColor = .green
+            UIView.animate(withDuration: 1.0) {
+                sender.backgroundColor = originalColor
+            }
+        }
+    }
+    
+    func handleRememberAction() {
+        if let text = UIPasteboard.general.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if text.count < 3 { return }
+            
+            let prefs = UserDefaults.standard
+            var memories = prefs.stringArray(forKey: "typira_memories") ?? []
+            if !memories.contains(text) {
+                memories.append(text)
+                prefs.set(memories, forKey: "typira_memories")
+            }
+        }
+    }
 }

@@ -7,6 +7,9 @@ import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.view.KeyEvent
 import java.util.Locale
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 
 class TypiraInputMethodService : InputMethodService() {
 
@@ -69,6 +72,9 @@ class TypiraInputMethodService : InputMethodService() {
         val space = rootView.findViewById<Button>(R.id.key_space)
         space?.setOnClickListener { onKeyClick("space") }
         setupSpaceKeyTrackpad(space)
+
+        val rememberBtn = rootView.findViewById<Button>(R.id.btn_remember)
+        rememberBtn?.setOnClickListener { handleRememberAction() }
 
         letterButtons.clear()
         findLetterKeys(rootView)
@@ -318,5 +324,34 @@ class TypiraInputMethodService : InputMethodService() {
         if (this::emojiButton.isInitialized) emojiButton.text = "☺"
         if (this::modeButton.isInitialized) modeButton.text = "?123"
         if (this::shiftButton.isInitialized) updateShiftUI()
+    }
+
+    private fun handleRememberAction() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipData = clipboard.primaryClip
+        if (clipData != null && clipData.itemCount > 0) {
+            val text = clipData.getItemAt(0).text?.toString()
+            if (!text.isNullOrBlank()) {
+                // Sanitize: Simple length check for now
+                if (text.length < 3) {
+                    Toast.makeText(this, "Text too short to remember", Toast.LENGTH_SHORT).show()
+                    return
+                }
+                
+                saveMemory(text)
+                Toast.makeText(this, "🧠 Memory Saved", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "Nothing to remember", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveMemory(text: String) {
+        val prefs = getSharedPreferences("typira_memory", Context.MODE_PRIVATE)
+        val memories = prefs.getStringSet("memories", mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+        memories.add(text)
+        prefs.edit().putStringSet("memories", memories).apply()
     }
 }
