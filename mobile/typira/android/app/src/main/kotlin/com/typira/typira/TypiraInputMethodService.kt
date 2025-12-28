@@ -4,14 +4,11 @@ import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
-import android.widget.ImageButton
-import android.widget.LinearLayout
 import android.view.KeyEvent
 import java.util.Locale
 
 class TypiraInputMethodService : InputMethodService() {
 
-    // Logic for Caps Lock
     private enum class ShiftState {
         OFF,
         ON,
@@ -20,10 +17,20 @@ class TypiraInputMethodService : InputMethodService() {
 
     private var shiftState = ShiftState.OFF
     private var lastShiftPressTime: Long = 0
-    private val DOUBLE_TAP_TIMEOUT = 300L // ms
+    private val DOUBLE_TAP_TIMEOUT = 300L
+
+    private var isSymbols = false
+    private var isMoreSymbols = false
 
     private val letterButtons = mutableListOf<Button>()
-    private lateinit var shiftButton: ImageButton
+    private val qwertyChars = "qwertyuiopasdfghjklzxcvbnm"
+    // iOS Standard 123 Layout
+    private val symbolChars = "1234567890-/:;()$&@\".,?!'  " 
+    // iOS Standard #+= Layout
+    private val extraSymbolChars = "[]{}#%^*+=_\\|~<>€£¥•.,?!'  "
+
+    private lateinit var shiftButton: Button
+    private lateinit var modeButton: Button
 
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.keyboard_view, null)
@@ -32,27 +39,32 @@ class TypiraInputMethodService : InputMethodService() {
     }
 
     private fun setupKeyListeners(rootView: View) {
-        val backspace = rootView.findViewById<ImageButton>(R.id.key_backspace)
+        // Now using Button for backspace
+        val backspace = rootView.findViewById<Button>(R.id.key_backspace)
         backspace?.setOnClickListener { onKeyClick("⌫") }
+        // Set icon for backspace initially? Or text. Using text "⌫" or drawable.
+        // In XML we set text "⌫", but let's use the drawable if better.
+        // For now, text is fine.
 
-        shiftButton = rootView.findViewById<ImageButton>(R.id.key_shift)
+        shiftButton = rootView.findViewById<Button>(R.id.key_shift)
         shiftButton.setOnClickListener { handleShiftClick() }
 
-        val emoji = rootView.findViewById<ImageButton>(R.id.key_emoji)
+        val emoji = rootView.findViewById<Button>(R.id.key_emoji)
         emoji?.setOnClickListener { onKeyClick("☺") }
 
         val enter = rootView.findViewById<Button>(R.id.key_enter)
         enter?.setOnClickListener { onKeyClick("return") }
         
-        val mode = rootView.findViewById<Button>(R.id.key_mode)
-        mode?.setOnClickListener { onKeyClick("?123") }
+        modeButton = rootView.findViewById<Button>(R.id.key_mode)
+        modeButton.setOnClickListener { toggleSymbols() }
 
         val space = rootView.findViewById<Button>(R.id.key_space)
         space?.setOnClickListener { onKeyClick("space") }
 
+        letterButtons.clear()
         findLetterKeys(rootView)
         
-        updateShiftUI() // Initial State
+        updateShiftUI() 
     }
 
     private fun findLetterKeys(view: View) {
@@ -74,60 +86,99 @@ class TypiraInputMethodService : InputMethodService() {
     }
 
     private fun handleShiftClick() {
+        // If in Symbols mode, this button acts as "More Symbols" (#+=)
+        if (isSymbols) {
+            isMoreSymbols = !isMoreSymbols
+            if (isMoreSymbols) {
+                 shiftButton.text = "123" // Go back to first layer
+            } else {
+                 shiftButton.text = "#+="
+            }
+            updateKeys()
+            return
+        }
+    
+        // Normal Shift Logic
         val currentTime = System.currentTimeMillis()
-        
         if (shiftState == ShiftState.OFF) {
-            // OFF -> ON
-            // Check for double tap
             if (currentTime - lastShiftPressTime < DOUBLE_TAP_TIMEOUT) {
                  shiftState = ShiftState.LOCKED
             } else {
                  shiftState = ShiftState.ON
             }
         } else if (shiftState == ShiftState.ON) {
-            // ON -> Tap -> OFF (or Locked if fast enough double tap relative to first, but usually toggle)
-            // If user taps ON quickly after turning it ON, they might want LOCK.
             if (currentTime - lastShiftPressTime < DOUBLE_TAP_TIMEOUT) {
                 shiftState = ShiftState.LOCKED
             } else {
                 shiftState = ShiftState.OFF
             }
-        } else if (shiftState == ShiftState.LOCKED) {
-            // LOCKED -> Tap -> OFF
+        } else {
             shiftState = ShiftState.OFF
         }
         
         lastShiftPressTime = currentTime
         updateShiftUI()
     }
-
-    private fun updateShiftUI() {
-        when (shiftState) {
-            ShiftState.OFF -> {
-                shiftButton.setImageResource(R.drawable.ic_shift)
-                shiftButton.setBackgroundResource(R.drawable.key_background_special)
-                updateLetters(false)
-            }
-            ShiftState.ON -> {
-                shiftButton.setImageResource(R.drawable.ic_shift_fill)
-                shiftButton.setBackgroundResource(R.drawable.key_background) // Highlighted
-                updateLetters(true)
-            }
-            ShiftState.LOCKED -> {
-                shiftButton.setImageResource(R.drawable.ic_shift_lock)
-                shiftButton.setBackgroundResource(R.drawable.key_background) // Highlighted
-                updateLetters(true)
-            }
+    
+    private fun toggleSymbols() {
+        isSymbols = !isSymbols
+        isMoreSymbols = false // Reset extra layer
+        
+        if (isSymbols) {
+            modeButton.text = "ABC"
+            // Show "#+=" on shift button
+            shiftButton.background = null // clear special background
+            shiftButton.setBackgroundResource(R.drawable.key_background_special)
+            shiftButton.text = "#+="
+            shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0) // Clear icon
+        } else {
+            modeButton.text = "?123"
+            updateShiftUI() // Restore shift icon
         }
+        updateKeys()
     }
 
-    private fun updateLetters(upper: Boolean) {
-        for (btn in letterButtons) {
-            val currentText = btn.text.toString()
-            btn.text = if (upper) {
-                currentText.uppercase(Locale.getDefault())
+    private fun updateShiftUI() {
+        // Only updates icons when NOT in symbols mode
+        if (isSymbols) return 
+        
+        shiftButton.text = "" // Clear text
+        when (shiftState) {
+            ShiftState.OFF -> {
+                shiftButton.setBackgroundResource(R.drawable.key_background_special)
+                shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ic_shift, 0, 0)
+            }
+            ShiftState.ON -> {
+                shiftButton.setBackgroundResource(R.drawable.key_background)
+                shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ic_shift_fill, 0, 0)
+            }
+            ShiftState.LOCKED -> {
+                shiftButton.setBackgroundResource(R.drawable.key_background)
+                shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ic_shift_lock, 0, 0)
+            }
+        }
+        updateKeys()
+    }
+
+    private fun updateKeys() {
+        if (letterButtons.size != 26) return
+
+        for ((index, btn) in letterButtons.withIndex()) {
+            if (isSymbols) {
+                if (isMoreSymbols) {
+                     val char = extraSymbolChars.getOrNull(index) ?: ' '
+                     btn.text = char.toString()
+                } else {
+                     val char = symbolChars.getOrNull(index) ?: ' '
+                     btn.text = char.toString()
+                }
             } else {
-                currentText.lowercase(Locale.getDefault())
+                val char = qwertyChars.getOrNull(index) ?: ' '
+                if (shiftState != ShiftState.OFF) {
+                    btn.text = char.uppercaseChar().toString()
+                } else {
+                    btn.text = char.toString()
+                }
             }
         }
     }
@@ -143,13 +194,9 @@ class TypiraInputMethodService : InputMethodService() {
                 inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
             }
             "☺" -> inputConnection.commitText("😊", 1)
-            "?123", "\\?123" -> { /* TODO */ }
             else -> {
-                // Letter
                 inputConnection.commitText(keyText, 1)
-                
-                // Auto-disable if just ON (not LOCKED)
-                if (shiftState == ShiftState.ON) {
+                if (!isSymbols && shiftState == ShiftState.ON) {
                     shiftState = ShiftState.OFF
                     updateShiftUI()
                 }
@@ -159,8 +206,10 @@ class TypiraInputMethodService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        // Reset shift on new input
         shiftState = ShiftState.OFF
-        updateShiftUI()
+        isSymbols = false
+        isMoreSymbols = false
+        if (this::modeButton.isInitialized) modeButton.text = "?123"
+        if (this::shiftButton.isInitialized) updateShiftUI()
     }
 }

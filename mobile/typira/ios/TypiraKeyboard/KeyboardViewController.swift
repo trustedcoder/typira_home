@@ -19,11 +19,29 @@ class KeyboardViewController: UIInputViewController {
     
     // State
     var shiftState: ShiftState = .off
+    var isSymbols = false
+    var isMoreSymbols = false
+    
     var lastShiftPressTime: Double = 0
     let doubleTapTimeout: Double = 0.3
     
+    // Key Lists
     var letterButtons = [UIButton]()
+    let qwertyChars = "qwertyuiopasdfghjklzxcvbnm"
+    // iOS Standard 123 Layout (Mapped to 26 keys)
+    // Row 1: 1 2 3 4 5 6 7 8 9 0
+    // Row 2: - / : ; ( ) $ & @ "
+    // Row 3: . , ? ! ' (Only 5 keys standard, filled last 2 with duplicate/space)
+    let symbolChars = "1234567890-/:;()$&@\".,?!'  " 
+    
+    // iOS Standard #+= Layout
+    // Row 1: [ ] { } # % ^ * + =
+    // Row 2: _ \ | ~ < > € £ ¥ •
+    // Row 3: . , ? ! ' 
+    let extraSymbolChars = "[]{}#%^*+=_\\|~<>€£¥•.,?!'  "
+    
     var shiftButton: UIButton?
+    var modeButton: UIButton?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -35,7 +53,6 @@ class KeyboardViewController: UIInputViewController {
         self.view.subviews.forEach { $0.removeFromSuperview() }
         self.view.backgroundColor = UIColor(red: 209/255, green: 212/255, blue: 217/255, alpha: 1.0)
         
-        // Suggestion Strip
         let suggestionStrip = UIStackView()
         suggestionStrip.axis = .horizontal
         suggestionStrip.distribution = .fillProportionally
@@ -80,6 +97,7 @@ class KeyboardViewController: UIInputViewController {
         row3.distribution = .fillProportionally
         
         self.shiftButton = createButton(title: "⇧", isSpecial: true)
+        self.shiftButton?.tag = 101 // Shift Tag
         let backBtn = createButton(title: "⌫", isSpecial: true)
         
         row3.addArrangedSubview(shiftButton!)
@@ -100,24 +118,25 @@ class KeyboardViewController: UIInputViewController {
         row4.spacing = 6
         row4.distribution = .fillProportionally
         
-        let modeBtn = createButton(title: "123", isSpecial: true)
+        self.modeButton = createButton(title: "123", isSpecial: true)
+        self.modeButton?.tag = 102 // Mode Tag
         let emojiBtn = createButton(title: "☺", isSpecial: true)
         let spaceBtn = createButton(title: "space", isSpecial: false)
         let returnBtn = createButton(title: "return", isSpecial: true)
         
-        row4.addArrangedSubview(modeBtn)
+        row4.addArrangedSubview(modeButton!)
         row4.addArrangedSubview(emojiBtn)
         row4.addArrangedSubview(spaceBtn)
         row4.addArrangedSubview(returnBtn)
         
         NSLayoutConstraint.activate([
-            modeBtn.widthAnchor.constraint(equalTo: emojiBtn.widthAnchor),
+            modeButton!.widthAnchor.constraint(equalTo: emojiBtn.widthAnchor),
             spaceBtn.widthAnchor.constraint(greaterThanOrEqualTo: emojiBtn.widthAnchor, multiplier: 4),
             returnBtn.widthAnchor.constraint(equalTo: emojiBtn.widthAnchor, multiplier: 1.5)
         ])
         mainStack.addArrangedSubview(row4)
         
-        updateShiftUI() // Init
+        updateShiftUI()
     }
     
     func createChip(title: String) -> UIButton {
@@ -154,9 +173,16 @@ class KeyboardViewController: UIInputViewController {
              button.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
              button.backgroundColor = UIColor(white: 0.65, alpha: 1.0)
         } else {
+             // Character Keys
              button.titleLabel?.font = UIFont.systemFont(ofSize: 25, weight: .regular)
              button.backgroundColor = .white
-             letterButtons.append(button)
+             
+             // FIX: Only add to letterButtons if it's one of the 26 QWERTY keys.
+             // We can check if the title is a single letter (a-z).
+             // 'space' has length 5, so it won't be added.
+             if title.count == 1 {
+                 letterButtons.append(button)
+             }
         }
         
         button.setTitleColor(.black, for: .normal)
@@ -170,35 +196,70 @@ class KeyboardViewController: UIInputViewController {
     }
     
     @objc func didTapKey(_ sender: UIButton) {
-        let key = sender.title(for: .normal) ?? ""
+        let title = sender.title(for: .normal) ?? ""
         let proxy = self.textDocumentProxy
         
-        // Handle Shift Special Case
-        // Note: The button title might change (⇧ vs ⇪), so checking reference or tag is better.
-        // But here we rely on the button action triggering based on original title?
-        // Ah, if we change the title to '⇪', hitting it again will pass '⇪' to this function.
-        if sender == shiftButton {
+        // Use Tags for reliable identification
+        if sender.tag == 101 { // Shift
              handleShiftTap()
              return
         }
         
-        switch key {
+        if sender.tag == 102 { // Mode (123)
+            toggleSymbols()
+            return
+        }
+        
+        switch title {
         case "space": proxy.insertText(" ")
         case "⌫": proxy.deleteBackward()
         case "return": proxy.insertText("\n")
-        case "123", "☺": break
+        case "☺": break
         default:
-            proxy.insertText(key)
-            if shiftState == .on {
-                shiftState = .off
-                updateShiftUI()
+            // Prevent accidentally typing control labels if logic fails
+            if title == "123" || title == "ABC" || title == "#+=" || title == "Shift" {
+                break
+            }
+            
+            proxy.insertText(title)
+            
+            if !isSymbols && shiftState == .on {
+                 shiftState = .off
+                 updateShiftUI()
             }
         }
     }
     
-    func handleShiftTap() {
-        let now = Date().timeIntervalSince1970
+    func toggleSymbols() {
+        isSymbols = !isSymbols
+        isMoreSymbols = false // Reset
         
+        if isSymbols {
+            modeButton?.setTitle("ABC", for: .normal)
+            // Replace Shift with #+=
+            shiftButton?.setTitle("#+=", for: .normal)
+        } else {
+            modeButton?.setTitle("123", for: .normal)
+            updateShiftUI() // Restore icon
+        }
+        updateKeys()
+    }
+    
+    func handleShiftTap() {
+        if isSymbols {
+             // Toggle More Symbols
+             isMoreSymbols = !isMoreSymbols
+             if isMoreSymbols {
+                  shiftButton?.setTitle("123", for: .normal) // Button to go back
+             } else {
+                  shiftButton?.setTitle("#+=", for: .normal)
+             }
+             updateKeys()
+             return
+        }
+    
+        // Normal Shift Logic
+        let now = Date().timeIntervalSince1970
         if shiftState == .off {
             if now - lastShiftPressTime < doubleTapTimeout {
                 shiftState = .locked
@@ -212,39 +273,62 @@ class KeyboardViewController: UIInputViewController {
                 shiftState = .off
             }
         } else {
-            // Locked -> Off
             shiftState = .off
         }
-        
         lastShiftPressTime = now
         updateShiftUI()
     }
     
     func updateShiftUI() {
+        if isSymbols { return }
+        
+        // Shift Button Visuals
         switch shiftState {
         case .off:
             shiftButton?.setTitle("⇧", for: .normal)
             shiftButton?.backgroundColor = UIColor(white: 0.65, alpha: 1.0)
             shiftButton?.setTitleColor(.black, for: .normal)
-            updateLetters(upper: false)
         case .on:
             shiftButton?.setTitle("⇧", for: .normal)
-            shiftButton?.backgroundColor = .white // Active look
+            shiftButton?.backgroundColor = .white
             shiftButton?.setTitleColor(.black, for: .normal)
-            updateLetters(upper: true)
         case .locked:
-             shiftButton?.setTitle("⇪", for: .normal) // Lock Icon
+             shiftButton?.setTitle("⇪", for: .normal)
              shiftButton?.backgroundColor = .white
              shiftButton?.setTitleColor(.black, for: .normal)
-             updateLetters(upper: true)
         }
+        updateKeys() // Ensure keys are updated with case
     }
     
-    func updateLetters(upper: Bool) {
-        for btn in letterButtons {
-            guard let text = btn.title(for: .normal) else { continue }
-            let newText = upper ? text.uppercased() : text.lowercased()
-            btn.setTitle(newText, for: .normal)
+    func updateKeys() {
+        // Remove strict count check to avoid silent failures
+        // guard letterButtons.count == 26 else { return }
+        
+        let qwertyArray = Array(qwertyChars)
+        let symbolArray = Array(symbolChars)
+        // Pad extra array to ensure safety
+        var extraString = extraSymbolChars
+        while extraString.count < 26 { extraString += " " }
+        let extraArray = Array(extraString)
+        
+        for (index, btn) in letterButtons.enumerated() {
+            // Safety check for indices
+            if isSymbols {
+                if isMoreSymbols {
+                     let char = index < extraArray.count ? extraArray[index] : " "
+                     btn.setTitle(String(char), for: .normal)
+                } else {
+                     let char = index < symbolArray.count ? symbolArray[index] : " "
+                     btn.setTitle(String(char), for: .normal)
+                }
+            } else {
+                let char = index < qwertyArray.count ? qwertyArray[index] : " "
+                if shiftState != .off {
+                    btn.setTitle(String(char).uppercased(), for: .normal)
+                } else {
+                    btn.setTitle(String(char), for: .normal)
+                }
+            }
         }
     }
 

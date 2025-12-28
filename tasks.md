@@ -6,7 +6,7 @@
 - [ ] **Layout Engine**:
     - [x] Design and implement QWERTY Keys layout (XML/SwiftUI/Jetpack Compose).
     - [x] Implement Shift/Caps Lock logic.
-    - [ ] Implement Symbol/Numeric layer switching.
+    - [x] Implement Symbol/Numeric layer switching.
 - [ ] **Input Handling**:
     - [ ] Handle key presses and commit text to InputConnection/TextDocumentProxy.
     - [ ] Implement deletion (Backspace) interactions.

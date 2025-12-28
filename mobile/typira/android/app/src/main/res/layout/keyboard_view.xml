@@ -107,13 +107,10 @@
             android:paddingHorizontal="3dp"
             android:weightSum="10"> 
 
-            <ImageButton 
+            <Button 
                 android:id="@+id/key_shift" 
                 style="@style/KeyboardKeySpecial" 
-                android:src="@drawable/ic_shift"
-                android:scaleType="centerInside"
-                android:padding="12dp"
-                android:contentDescription="Shift"
+                android:text=""
                 android:layout_weight="1.5" />
             
             <Button android:id="@+id/key_z" style="@style/KeyboardKey" android:text="z" />
@@ -124,13 +121,10 @@
             <Button android:id="@+id/key_n" style="@style/KeyboardKey" android:text="n" />
             <Button android:id="@+id/key_m" style="@style/KeyboardKey" android:text="m" />
             
-            <ImageButton 
+            <Button 
                 android:id="@+id/key_backspace" 
                 style="@style/KeyboardKeySpecial" 
-                android:src="@drawable/ic_backspace"
-                android:scaleType="centerInside"
-                android:padding="12dp"
-                android:contentDescription="Backspace"
+                android:text="⌫"
                 android:layout_weight="1.5"/>
         </LinearLayout>
         
@@ -144,13 +138,11 @@
 
             <Button android:id="@+id/key_mode" style="@style/KeyboardKeySpecial" android:text="\?123" android:textSize="14sp" android:layout_weight="1.5" />
             
-            <ImageButton 
+            <Button 
                 android:id="@+id/key_emoji" 
                 style="@style/KeyboardKeySpecial" 
-                android:src="@drawable/ic_emoji"
-                android:scaleType="centerInside"
-                android:padding="10dp"
-                android:contentDescription="Emoji"
+                android:text="☺"
+                android:textSize="20sp"
                 android:layout_weight="1.5" />
                 
             <Button android:id="@+id/key_space" style="@style/KeyboardKey" android:text="" android:layout_weight="5" />
