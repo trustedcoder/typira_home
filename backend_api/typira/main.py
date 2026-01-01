@@ -74,14 +74,36 @@ async def remember_context(text: str = Form(...)):
     print(f"🧠 Memory stored: {text}")
     return {"status": "success"}
 
-@app.post("/tts")
-async def text_to_speech(text: str = Form(...)):
+@app.post("/suggest")
+async def suggest_text(text: str = Form(...), context: str = Form("")):
     """
-    Placeholder for TTS - Note: Gemini doesn't have a direct raw audio output API 
-    for TTS like OpenAI yet, so we might need Google Cloud TTS or similar.
+    Provides a real-time suggestion based on current text and user context.
+    optimized for speed (using gemini-3-flash).
     """
-    # TODO: Integrate Google Cloud TTS for high-quality audio
-    return {"message": "TTS pending integration with Google Cloud TTS", "text": text}
+    print(text)
+    try:
+        # Prompt to generate a full sentence based on current input
+        prompt = f"""You are Typira AI, a predictive text assistant.
+User Background Context: {context}
+
+User has typed: "{text}"
+
+Generate a complete, grammatically correct sentence that continues naturally from the given text. The sentence should be self-contained and end properly.
+Rules:
+1. Return the full sentence (including the provided text) as a single string.
+2. Do NOT truncate; ensure the sentence is complete.
+3. Keep it concise and natural.
+4. If no suitable sentence can be formed, return an empty string.
+
+Sentence:"""
+        
+        response = model.generate_content(prompt)
+        full_sentence = response.text.strip().replace('"', '')
+        print(full_sentence)
+        return {"suggestion": full_sentence}
+    except Exception as e:
+        print(f"Suggestion Error: {e}")
+        return {"suggestion": ""}
 
 if __name__ == "__main__":
     import uvicorn

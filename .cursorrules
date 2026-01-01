@@ -27,10 +27,10 @@
 - **Modern Python**: Use modern Python 3.10+ features (e.g., match statements, union types `|`).
 
 # Hybrid Architecture Policy (Keyboard)
-- **Native for Core Input**: The keyboard's core rendering, input handling (QWERTY, Symbols, Emoji board), and performance-critical gestures (Spacebar trackpad) MUST remain native (Swift for iOS, Kotlin for Android). This is to respect strict memory limits and ensure zero-latency typing.
-- **Flutter for Intelligence & UI**: All "Intelligence" features (AI Memory management, Dashboard, Goal tracking, Settings, Backend connectivity) MUST be built in Flutter.
-- **Bridging**: Use `MethodChannel` (Android) and `FlutterMethodChannel` (iOS) to communicate between the native keyboard extension/service and the Flutter engine.
-- **Memory Conservation**: Be extremely cautious with resource usage in the Native Keyboard layer. Avoid loading large assets or background processes that could exceed iOS keyboard memory limits.
+- **Native-First for Keyboard**: To ensure maximum reliability, zero-latency typing, and minimal memory usage, **ALL** core keyboard features (Rendering, Input Handling, Suggestions, Rewriting, Voice) MUST be implemented using native code (Swift for iOS, Kotlin for Android) within the keyboard extension/service context.
+- **Native Networking**: Use native networking (URLSession on iOS, OkHttp on Android) for all real-time keyboard actions to bypass bridge overhead and prevent connection timeouts.
+- **Flutter for Dashboards & Complex Apps**: The Flutter layer remains the primary engine for the main "Typeira" application, user-facing dashboards, complex settings, and long-form AI interactions.
+- **Memory Conservation**: Be extremely cautious with resource usage in the Native Keyboard layer. Avoid loading large assets or initializing the FlutterEngine in the background extension unless strictly necessary (prefer native solutions for the extension).
 
 # Project Structure specific
 - `backend_api/`: Python backend code.
@@ -46,4 +46,11 @@
   - **Inline**: Use "Smart Toasts" or "Bubbles" for immediate text-based actions.
   - **App-Level**: Use System Notifications for complex actions that require the full Typira App (e.g., long-form article writing, goal setup).
 - **Scalability**: The Agent Hub MUST use a dynamic grid (Collection/RecyclerView) to allow adding new agentic tools (image-to-text, productivity tips, etc.) without redesigning the UI.
+
+# Memory Stewardship & Cleanup
+- **Proactive Cancellation**: Always use `CancelToken` (Dart) or `URLSessionTask.cancel()` (Swift) or `Call.cancel()` (Kotlin) to abort obsolete background tasks (especially network requests) immediately as new input arrives.
+- **Nullification**: Set large objects, media buffers, or temporary file paths to `null`/`nil` as soon as their functional lifecycle ends.
+- **Weak References**: Use `[weak self]` in Swift closures and avoid passing raw `Activity`/`Context` pointers into long-lived background threads in Android to prevent retain cycles.
+- **Explicit Disposal**: Always override `onDestroy` (Android), `deinit` (iOS), and `onClose` (GetX/Dart) to invalidate timers, close streams, and clear caches.
+- **Minimal Buffers**: Use sliding windows or fixed-size limits for all historical text buffers or caches to prevent unbounded RAM growth.
 

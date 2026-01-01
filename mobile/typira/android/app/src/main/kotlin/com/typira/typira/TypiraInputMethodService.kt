@@ -2,7 +2,6 @@ package com.typira.typira
 
 import android.inputmethodservice.InputMethodService
 import android.view.View
-import android.view.MotionEvent
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.view.KeyEvent
@@ -10,26 +9,18 @@ import java.util.Locale
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
-import android.media.AudioRecord
-import android.media.MediaRecorder
-import android.media.AudioFormat
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
-import kotlin.concurrent.thread
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.embedding.engine.dart.DartExecutor
-import io.flutter.plugin.common.MethodChannel
 import android.speech.tts.TextToSpeech
+import android.view.inputmethod.ExtractedTextRequest
 
 class TypiraInputMethodService : InputMethodService() {
 
-    private enum class ShiftState {
-        OFF,
-        ON,
-        LOCKED
-    }
-
+    private enum class KeyboardState { MAIN, EMOJI, AGENT }
+    private var keyboardState = KeyboardState.MAIN
+    
+    private enum class ShiftState { OFF, ON, LOCKED }
     private var shiftState = ShiftState.OFF
     private var lastShiftPressTime: Long = 0
     private val DOUBLE_TAP_TIMEOUT = 300L
@@ -39,35 +30,51 @@ class TypiraInputMethodService : InputMethodService() {
 
     private val letterButtons = mutableListOf<Button>()
     private val qwertyChars = "qwertyuiopasdfghjklzxcvbnm"
-    // iOS Standard 123 Layout
     private val symbolChars = "1234567890-/:;()$&@\".,?!'  " 
-    // iOS Standard #+= Layout
     private val extraSymbolChars = "[]{}#%^*+=_\\|~<>€£¥•.,?!'  "
 
+    // UI Components
     private lateinit var shiftButton: Button
     private lateinit var modeButton: Button
     private lateinit var emojiButton: Button
     private lateinit var layoutQwerty: View
     private lateinit var layoutEmoji: View
+    private lateinit var layoutAgentHub: View
+    private lateinit var containerAgentHub: android.widget.LinearLayout
     private lateinit var gridEmoji: android.widget.GridLayout
-
-    private var isEmojiView = false
+    private lateinit var tvSuggestion: android.widget.TextView
     
-    private var isRecording = false
-    private var mediaRecorder: android.media.MediaRecorder? = null
-    private var currentAudioPath: String? = null
-
-    private var flutterEngine: FlutterEngine? = null
-    private var methodChannel: MethodChannel? = null
-    private val CHANNEL = "com.typira.typira/intelligence"
+    // Logic
+    private val suggestionHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var suggestionRunnable: Runnable? = null
+    private var contextBuffer = StringBuilder()
     
     private var tts: TextToSpeech? = null
+    private var lastSuggestedCompletion: String = ""
+    private var lastTypedLength: Int = 0
+
+    // Services
+    private lateinit var aiService: AIService
+    private lateinit var audioService: AudioService
+    private lateinit var uiManager: KeyboardUIManager
+
+    override fun onCreate() {
+        super.onCreate()
+        aiService = AIService()
+        audioService = AudioService()
+        uiManager = KeyboardUIManager(this)
+    }
 
     override fun onCreateInputView(): View {
         val view = layoutInflater.inflate(R.layout.keyboard_view, null)
-        setupFlutter()
         setupTTS()
         setupKeyListeners(view)
+        
+        // Use UI Manager for complex parts
+        layoutAgentHub = view.findViewById(R.id.layout_agent_hub)
+        containerAgentHub = view.findViewById(R.id.container_agent_hub)
+        uiManager.createAgentHub(containerAgentHub, { showKeyboardState(KeyboardState.MAIN) }, { action -> onAgentActionClick(action) })
+        
         return view
     }
 
@@ -79,36 +86,12 @@ class TypiraInputMethodService : InputMethodService() {
         }
     }
 
-    private fun setupFlutter() {
-        if (flutterEngine == null) {
-            flutterEngine = FlutterEngine(this)
-            flutterEngine?.dartExecutor?.executeDartEntrypoint(
-                DartExecutor.DartEntrypoint.createDefault()
-            )
-            methodChannel = MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger!!, CHANNEL)
-            methodChannel?.setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "commitText" -> {
-                        val text = call.arguments as? String
-                        if (text != null) {
-                            currentInputConnection?.commitText(text, 1)
-                            result.success(true)
-                        } else {
-                            result.error("INVALID_ARGUMENT", "Text is null", null)
-                        }
-                    }
-                    else -> result.notImplemented()
-                }
-            }
-        }
-    }
-
     private fun setupKeyListeners(rootView: View) {
         layoutQwerty = rootView.findViewById(R.id.layout_qwerty)
         layoutEmoji = rootView.findViewById(R.id.layout_emoji)
         gridEmoji = rootView.findViewById(R.id.grid_emoji)
 
-        // Now using Button for backspace
+        // Backspace
         val backspace = rootView.findViewById<Button>(R.id.key_backspace)
         backspace?.setOnClickListener { onKeyClick("⌫") }
 
@@ -128,91 +111,133 @@ class TypiraInputMethodService : InputMethodService() {
         space?.setOnClickListener { onKeyClick("space") }
         setupSpaceKeyTrackpad(space)
 
-        val rewriteBtn = rootView.findViewById<Button>(R.id.btn_rewrite)
-        rewriteBtn?.setOnClickListener { 
-            val currentText = currentInputConnection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString() ?: ""
-            if (currentText.isNotEmpty()) {
-                methodChannel?.invokeMethod("requestRewrite", currentText)
-                Toast.makeText(this, "✨ Rewriting...", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Type something first", Toast.LENGTH_SHORT).show()
-            }
-        }
+        // AI Action Toolbar
+        val onAgentClick = View.OnClickListener { showKeyboardState(KeyboardState.AGENT) }
+        rootView.findViewById<View>(R.id.btn_hub)?.setOnClickListener(onAgentClick)
+        rootView.findViewById<View>(R.id.btn_rewrite_icon)?.setOnClickListener(onAgentClick)
+        rootView.findViewById<View>(R.id.btn_paste_icon)?.setOnClickListener { handleRememberAction() }
+        rootView.findViewById<View>(R.id.btn_mic_icon)?.setOnClickListener { handleMicAction() }
 
-        val rememberBtn = rootView.findViewById<Button>(R.id.btn_remember)
-        rememberBtn?.setOnClickListener { handleRememberAction() }
-
-        val micBtn = rootView.findViewById<Button>(R.id.btn_mic)
-        micBtn?.setOnClickListener { handleMicAction() }
-
-        val listenBtn = rootView.findViewById<Button>(R.id.btn_listen)
-        listenBtn?.setOnClickListener { handleListenAction() }
+        // Suggestion Toolbar
+        tvSuggestion = rootView.findViewById(R.id.tv_suggestion)
+        tvSuggestion.setOnClickListener { acceptSuggestion() }
+        populateSuggestions("Typira is analyzing your context... (Tap to insert)")
 
         letterButtons.clear()
         findLetterKeys(rootView)
         
         updateShiftUI() 
-        populateEmojiGrid()
+        uiManager.populateEmojiGrid(gridEmoji) { emoji -> onKeyClick(emoji) }
+    }
+
+    private fun acceptSuggestion() {
+        if (lastSuggestedCompletion.isNotEmpty()) {
+
+            val extractedText = try {
+                currentInputConnection?.getExtractedText(
+                    ExtractedTextRequest(), 0
+                )
+            } catch (e: Exception) {
+                null
+            }
+
+            val totalLength = extractedText?.text?.length ?: 0
+
+            if (totalLength > 0) {
+                // Delete everything before and after cursor
+                currentInputConnection?.deleteSurroundingText(
+                    totalLength,   // before cursor
+                    totalLength    // after cursor
+                )
+            }
+
+            // Insert suggestion
+            currentInputConnection?.commitText("$lastSuggestedCompletion ", 1)
+
+            // Update internal buffer
+            contextBuffer.clear()
+            contextBuffer.append("$lastSuggestedCompletion ")
+
+            // Reset state
+            lastSuggestedCompletion = ""
+            lastTypedLength = 0
+            tvSuggestion.text = "..."
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
+        suggestionRunnable = null
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
     }
 
     private fun toggleEmojiView() {
-        isEmojiView = !isEmojiView
-        if (isEmojiView) {
-            layoutQwerty.visibility = View.GONE
-            layoutEmoji.visibility = View.VISIBLE
-            emojiButton.text = "ABC"
+        if (keyboardState == KeyboardState.EMOJI) {
+            showKeyboardState(KeyboardState.MAIN)
         } else {
-            layoutQwerty.visibility = View.VISIBLE
-            layoutEmoji.visibility = View.GONE
-            emojiButton.text = "☺"
+            showKeyboardState(KeyboardState.EMOJI)
         }
     }
 
-    private fun populateEmojiGrid() {
-        val emojiGroups = listOf(
-            listOf("😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗"),
-            listOf("🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "🥵", "🥶", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾"),
-            listOf("🤲", "👐", "🙌", "👏", "🤝", "👍", "👎", "👊", "✊", "🤛", "🤜", "🤞", "✌️", "🤟", "🤘", "👌", "👈", "👉", "👆", "👇", "☝️", "✋", "🤚", "🖐", "🖖", "👋", "🤙", "💪", "🖕", "✍️", "🙏", "💍", "💄", "💋", "👄", "👅", "👂", "👃", "👣", "👁", "👀", "🧠", "🗣", "👤", "👥"),
-            listOf("🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷", "🐽", "🐸", "🐵", "🙈", "🙉", "🙊", "🐒", "🐔", "🐧", "🐦", "🐤", "🐣", "🐥", "🦆", "🦅", "🦉", "🦇", "🐺", "🐗", "🐴", "🦄", "🐝", "🐛", "🦋", "🐌", "🐞", "🐜", "🦟", "🦗", "🕷", "🕸", "🦂", "🐢", "🐍", "🦎", "🦖", "🦕", "🐙", "🦑", "🦐", "🦞", "🦀", "🐡", "🐠", "🐟", "🐬", "🐳", "🐋", "🦈", "🐊", "🐅", "🐆", "🦓", "🦍", "🦧", "🐘", "🦛", "🦏", "🐪", "🐫", "🦒", "🦘", "🐃", "🐂", "🐄", "🐎", "🐖", "🐏", "🐑", "🦙", "🐐", "🦌", "🐕", "🐩", "🦮", "🐕‍🦺", "🐈", "🐓", "🦃", "🦚", "🦜", "🦢", "🦩", "🕊", "🐇", "🦝", "🦨", "🦡", "🦦", "🦥", "🐁", "🐀", "🐿", "🦔", "🐾", "🐉", "🐲", "🌵", "🎄", "🌲", "🌳", "🌴", "🌱", "🌿", "☘️", "🍀", "🎍", "🎋", "🍃", "🍂", "🍁", "🍄", "🐚", "🌾", "💐", "🌷", "🌹", "🥀", "🌺", "🌸", "🌼", "🌻", "🌞", "🌝", "🌛", "🌜", "🌚", "🌕", "🌖", "🌗", "🌘", "🌑", "🌒", "🌓", "🌔", "🌙", "🌎", "🌍", "🌏", "🪐", "💫", "⭐️", "🌟", "✨", "⚡️", "☄️", "💥", "🔥", "🌪", "🌈", "☀️", "🌤", "⛅️", "🌥", "☁️", "🌦", "🌧", "⛈", "🌩", "🌨", "❄️", "☃️", "⛄️", "🌬", "💨", "💧", "💦", "☔️", "☂️", "🌊", "🌫")
-        )
+    private fun showKeyboardState(state: KeyboardState) {
+        keyboardState = state
+        layoutQwerty.visibility = if (state == KeyboardState.MAIN) View.VISIBLE else View.GONE
+        layoutEmoji.visibility = if (state == KeyboardState.EMOJI) View.VISIBLE else View.GONE
+        layoutAgentHub.visibility = if (state == KeyboardState.AGENT) View.VISIBLE else View.GONE
+        emojiButton.text = if (state == KeyboardState.EMOJI) "ABC" else "☺"
+    }
 
-        gridEmoji.removeAllViews()
-        for (group in emojiGroups) {
-            for (emoji in group) {
-                val btn = Button(this, null, 0, R.style.KeyboardKey)
-                btn.text = emoji
-                btn.textSize = 28f
-                btn.setPadding(0, 0, 0, 0)
-                val params = android.widget.GridLayout.LayoutParams()
-                params.width = 0
-                params.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-                params.columnSpec = android.widget.GridLayout.spec(android.widget.GridLayout.UNDEFINED, 1f)
-                btn.layoutParams = params
-                btn.setOnClickListener { onKeyClick(emoji) }
-                gridEmoji.addView(btn)
+    private fun onAgentActionClick(action: String) {
+        Toast.makeText(this, "Agent: $action", Toast.LENGTH_SHORT).show()
+        if (action == "Rewrite") {
+            val currentText = currentInputConnection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString() ?: ""
+            if (currentText.isNotEmpty()) {
+                requestNativeRewrite(currentText)
             }
-            // Optional: spacer behavior would need a different view types in GridLayout or nested layouts.
-            // For now, consistent grid is fine.
+            showKeyboardState(KeyboardState.MAIN)
         }
     }
 
+    private fun requestNativeRewrite(text: String) {
+        val prefs = getSharedPreferences("typira_memory", Context.MODE_PRIVATE)
+        val memories = prefs.getStringSet("memories", setOf())?.joinToString(". ") ?: ""
+        
+        aiService.rewriteText(text, memories, object : AIService.GenericCallback {
+            override fun onSuccess(result: String) {
+                if (result.isNotEmpty()) {
+                    currentInputConnection?.commitText("\n$result", 1)
+                }
+            }
+            override fun onFailure(error: String) {
+                android.util.Log.e("Typira", "Rewrite Error: $error")
+            }
+        })
+    }
+
+    private fun populateSuggestions(suggestion: String) {
+        tvSuggestion.text = suggestion
+    }
+
+    // (setupSpaceKeyTrackpad remains same - too tightly coupled to keep inline)
     private fun setupSpaceKeyTrackpad(spaceKey: View?) {
-        spaceKey?.setOnTouchListener(object : View.OnTouchListener {
+         spaceKey?.setOnTouchListener(object : View.OnTouchListener {
             private var lastX = 0f
             private var initialX = 0f
             private val MOVE_THRESHOLD = 20f 
             private var isSliding = false
             
-            override fun onTouch(v: View, event: MotionEvent): Boolean {
+            override fun onTouch(v: View, event: android.view.MotionEvent): Boolean {
                 when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
+                    android.view.MotionEvent.ACTION_DOWN -> {
                         lastX = event.x
                         initialX = event.x
                         isSliding = false
-                        // Don't consume yet, wait to see if it's a slide
                         return false 
                     }
-                    MotionEvent.ACTION_MOVE -> {
+                    android.view.MotionEvent.ACTION_MOVE -> {
                         val deltaX = event.x - lastX
                         if (!isSliding && Math.abs(event.x - initialX) > MOVE_THRESHOLD) {
                              isSliding = true
@@ -220,32 +245,25 @@ class TypiraInputMethodService : InputMethodService() {
                         
                         if (isSliding) {
                              if (Math.abs(deltaX) > MOVE_THRESHOLD) {
-                                  // Move Cursor
                                   val direction = if (deltaX > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
                                   currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, direction))
                                   currentInputConnection?.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, direction))
                                   lastX = event.x
                              }
-                             return true // Consume dragging
+                             return true
                         }
                         return false
                     }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        // If it was a slide, we consumed it. If not, it falls through to click.
-                        // But wait, if we return false on DOWN, the ClickListener usually fires on UP.
-                        // We need to ensure we don't trigger click if we slid.
-                        // Since we return true during MOVE if sliding, the sequence might be interrupted for Click?
-                        // Actually, standard OnClickListener fires on UP if not consumed.
-                        // If isSliding was true, we should return true here to prevent Click.
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
                         return isSliding
                     }
                 }
                 return false
             }
         })
-
     }
-
+    
+    // (findLetterKeys remains same)
     private fun findLetterKeys(view: View) {
         if (view is Button) {
             val text = view.text.toString()
@@ -265,12 +283,11 @@ class TypiraInputMethodService : InputMethodService() {
     }
 
     private fun handleShiftClick() {
-        if (isEmojiView) toggleEmojiView()
-        // If in Symbols mode, this button acts as "More Symbols" (#+=)
+        if (keyboardState == KeyboardState.EMOJI) toggleEmojiView()
         if (isSymbols) {
             isMoreSymbols = !isMoreSymbols
             if (isMoreSymbols) {
-                 shiftButton.text = "123" // Go back to first layer
+                 shiftButton.text = "123" 
             } else {
                  shiftButton.text = "#+="
             }
@@ -278,7 +295,6 @@ class TypiraInputMethodService : InputMethodService() {
             return
         }
     
-        // Normal Shift Logic
         val currentTime = System.currentTimeMillis()
         if (shiftState == ShiftState.OFF) {
             if (currentTime - lastShiftPressTime < DOUBLE_TAP_TIMEOUT) {
@@ -301,29 +317,27 @@ class TypiraInputMethodService : InputMethodService() {
     }
     
     private fun toggleSymbols() {
-        if (isEmojiView) toggleEmojiView()
+        if (keyboardState == KeyboardState.EMOJI) toggleEmojiView()
         isSymbols = !isSymbols
-        isMoreSymbols = false // Reset extra layer
+        isMoreSymbols = false
         
         if (isSymbols) {
             modeButton.text = "ABC"
-            // Show "#+=" on shift button
-            shiftButton.background = null // clear special background
+            shiftButton.background = null
             shiftButton.setBackgroundResource(R.drawable.key_background_special)
             shiftButton.text = "#+="
-            shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0) // Clear icon
+            shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
         } else {
             modeButton.text = "?123"
-            updateShiftUI() // Restore shift icon
+            updateShiftUI()
         }
         updateKeys()
     }
 
     private fun updateShiftUI() {
-        // Only updates icons when NOT in symbols mode
         if (isSymbols) return 
         
-        shiftButton.text = "" // Clear text
+        shiftButton.text = "" 
         when (shiftState) {
             ShiftState.OFF -> {
                 shiftButton.setBackgroundResource(R.drawable.key_background_special)
@@ -366,31 +380,106 @@ class TypiraInputMethodService : InputMethodService() {
 
     private fun onKeyClick(keyText: String) {
         val inputConnection = currentInputConnection ?: return
+        var isWordBoundary = false
         
         when (keyText) {
-            "⌫" -> inputConnection.deleteSurroundingText(1, 0)
-            "space" -> inputConnection.commitText(" ", 1)
+            "⌫" -> {
+                inputConnection.deleteSurroundingText(1, 0)
+                if (contextBuffer.length > 0) contextBuffer.deleteCharAt(contextBuffer.length - 1)
+                isWordBoundary = false
+            }
+            "space" -> {
+                inputConnection.commitText(" ", 1)
+                contextBuffer.append(" ")
+                isWordBoundary = true
+            }
             "return", "Go" -> {
                 inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
                 inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+                contextBuffer.append("\n")
+                isWordBoundary = true
             }
-            "☺" -> inputConnection.commitText("😊", 1)
+            "☺" -> {
+                inputConnection.commitText("😊", 1)
+                contextBuffer.append("😊")
+                isWordBoundary = true
+            }
             else -> {
                 inputConnection.commitText(keyText, 1)
+                contextBuffer.append(keyText)
                 if (!isSymbols && shiftState == ShiftState.ON) {
                     shiftState = ShiftState.OFF
                     updateShiftUI()
                 }
+                if (symbolChars.contains(keyText) || extraSymbolChars.contains(keyText)) {
+                     isWordBoundary = true
+                }
             }
         }
+        
+        if (contextBuffer.length > 1000) {
+            contextBuffer.delete(0, contextBuffer.length - 1000)
+        }
+
+        triggerSuggestion(isWordBoundary)
+    }
+    
+    private fun triggerSuggestion(isWordBoundary: Boolean) {
+        suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
+        val delay = if (isWordBoundary) 600L else 1500L
+        
+        suggestionRunnable = Runnable {
+            val text = contextBuffer.toString()
+            if (text.trim().length >= 3) {
+                 fetchAISuggestion(text)
+            } else {
+                 tvSuggestion.text = "Typira"
+            }
+        }
+        
+        suggestionHandler.postDelayed(suggestionRunnable!!, delay)
+    }
+    
+    private fun fetchAISuggestion(currentText: String) {
+        if (currentText.isBlank()) return
+        
+        tvSuggestion.alpha = 0.5f
+
+        val prefs = getSharedPreferences("typira_memory", Context.MODE_PRIVATE)
+        val memories = prefs.getStringSet("memories", setOf())?.joinToString(". ") ?: ""
+
+        // Use AI Service
+        aiService.fetchSuggestion(currentText, memories, object : AIService.SuggestionCallback {
+            override fun onSuccess(suggestion: String) {
+                tvSuggestion.alpha = 1.0f
+                if (suggestion.isEmpty()) {
+                    lastSuggestedCompletion = ""
+                    tvSuggestion.text = "..."
+                } else {
+                    lastSuggestedCompletion = suggestion
+                    tvSuggestion.text = "$suggestion (Tap to insert)"
+                }
+            }
+
+            override fun onFailure(error: String) {
+               android.util.Log.e("Typira", "Suggestion Failed: $error")
+               tvSuggestion.alpha = 1.0f
+            }
+
+            override fun onCancelled() {
+                // Ignore
+            }
+        })
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        contextBuffer.setLength(0) 
+        
         shiftState = ShiftState.OFF
         isSymbols = false
         isMoreSymbols = false
-        isEmojiView = false
+        keyboardState = KeyboardState.MAIN
         if (this::layoutQwerty.isInitialized) layoutQwerty.visibility = View.VISIBLE
         if (this::layoutEmoji.isInitialized) layoutEmoji.visibility = View.GONE
         if (this::emojiButton.isInitialized) emojiButton.text = "☺"
@@ -404,20 +493,15 @@ class TypiraInputMethodService : InputMethodService() {
         if (clipData != null && clipData.itemCount > 0) {
             val text = clipData.getItemAt(0).text?.toString()
             if (!text.isNullOrBlank()) {
-                // Sanitize: Simple length check for now
                 if (text.length < 3) {
                     Toast.makeText(this, "Text too short to remember", Toast.LENGTH_SHORT).show()
                     return
                 }
                 
-                // Bridge to Flutter for intelligence / storage
-                methodChannel?.invokeMethod("rememberText", text)
+                aiService.syncMemory(text)
+                saveMemory(text) 
                 Toast.makeText(this, "🧠 Memory Saved", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Nothing to remember", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -430,69 +514,33 @@ class TypiraInputMethodService : InputMethodService() {
 
     private fun handleMicAction() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Microphone permission required. Please enable in the main app.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_LONG).show()
             return
         }
 
-        if (isRecording) {
-            stopRecording()
+        if (audioService.isRecording) {
+            audioService.stopRecording(
+                onStop = { path ->
+                    Toast.makeText(this, "🎙️ Processing...", Toast.LENGTH_SHORT).show()
+                    aiService.uploadAudio(path, object : AIService.GenericCallback {
+                        override fun onSuccess(transcript: String) {
+                            if (transcript.isNotEmpty()) {
+                                currentInputConnection?.commitText(transcript + " ", 1)
+                            }
+                        }
+                        override fun onFailure(error: String) {
+                            Toast.makeText(this@TypiraInputMethodService, "STT Failed: $error", Toast.LENGTH_SHORT).show()
+                        }
+                    })
+                },
+                onError = { error -> Toast.makeText(this, error, Toast.LENGTH_SHORT).show() }
+            )
         } else {
-            startRecording()
+            audioService.startRecording(
+                cacheDir,
+                onStart = { Toast.makeText(this, "🎙️ Listening...", Toast.LENGTH_SHORT).show() },
+                onError = { error -> Toast.makeText(this, "Recording failed: $error", Toast.LENGTH_SHORT).show() }
+            )
         }
-    }
-
-    private fun startRecording() {
-        try {
-            val audioFile = java.io.File.createTempFile("typira_voice_", ".m4a", cacheDir)
-            currentAudioPath = audioFile.absolutePath
-
-            mediaRecorder = android.media.MediaRecorder()
-            mediaRecorder?.apply {
-                setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
-                setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
-                setOutputFile(currentAudioPath)
-                prepare()
-                start()
-            }
-
-            isRecording = true
-            Toast.makeText(this, "🎙️ Listening...", Toast.LENGTH_SHORT).show()
-        } catch (e: Exception) {
-            Toast.makeText(this, "Recording failed: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun stopRecording() {
-        try {
-            isRecording = false
-            mediaRecorder?.stop()
-            mediaRecorder?.release()
-            mediaRecorder = null
-            
-            Toast.makeText(this, "🎙️ Processing...", Toast.LENGTH_SHORT).show()
-            
-            // Send file path to Flutter for processing
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                methodChannel?.invokeMethod("processVoiceFile", currentAudioPath)
-            }
-        } catch (e: Exception) {
-            Toast.makeText(this, "Error stopping record: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun handleListenAction() {
-        val currentText = currentInputConnection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString() ?: ""
-        if (currentText.isNotEmpty()) {
-            tts?.speak(currentText, TextToSpeech.QUEUE_FLUSH, null, null)
-        } else {
-            Toast.makeText(this, "Nothing to read", Toast.LENGTH_SHORT).show()
-        }
-    }
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        tts?.stop()
-        tts?.shutdown()
     }
 }

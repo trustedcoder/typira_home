@@ -6,7 +6,10 @@ import 'package:get_storage/get_storage.dart';
 import 'package:dio/dio.dart' as dio;
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  print("DEBUG: Flutter main() started - PID: ${pid}");
   await GetStorage.init();
+  Get.put(TypiraController(), permanent: true);
   runApp(const TypiraIntelligenceApp());
 }
 
@@ -15,7 +18,11 @@ class TypiraController extends GetxController {
   var status = "Ready".obs;
   var memories = <String>[].obs;
   final storage = GetStorage();
-  final _dio = dio.Dio(dio.BaseOptions(baseUrl: 'http://10.0.2.2:8000')); // Android Emulator IP
+  final _dio = dio.Dio(dio.BaseOptions(
+    baseUrl: Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://localhost:8000',
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 30),
+  ));
 
   @override
   void onInit() {
@@ -26,9 +33,20 @@ class TypiraController extends GetxController {
     }
     
     platform.setMethodCallHandler(_handleMethod);
+
+    // DEBUG: Removed self-test to focus on typing logs
+  }
+
+  @override
+  void onClose() {
+    _suggestionCancelToken?.cancel("Controller disposing");
+    _suggestionCancelToken = null;
+    memories.clear();
+    super.onClose();
   }
 
   Future<dynamic> _handleMethod(MethodCall call) async {
+    print("DEBUG: Flutter received MethodChannel call: ${call.method} with args: ${call.arguments}");
     switch (call.method) {
       case "processVoiceFile":
         final String path = call.arguments;
@@ -40,6 +58,12 @@ class TypiraController extends GetxController {
       case "requestRewrite":
         final String text = call.arguments;
         return _requestRewrite(text);
+      case "getAISuggestion":
+        final String text = call.arguments;
+        return _getAISuggestion(text);
+      case "echo":
+        print("DEBUG: Echoing arguments: ${call.arguments}");
+        return "Dart Echo: ${call.arguments}";
       default:
         throw PlatformException(code: "Unimplemented", message: "Method ${call.method} not implemented");
     }
@@ -51,6 +75,39 @@ class TypiraController extends GetxController {
       storage.write('memories', memories.toList());
       status.value = "🧠 New Memory Saved";
     }
+  }
+
+  dio.CancelToken? _suggestionCancelToken;
+  
+  Future<String> _getAISuggestion(String text) async {
+    try {
+      print("DEBUG: [PID:$pid] Requesting suggestion for: '$text' (Memories: ${memories.length})");
+      final contextString = memories.join(". ");
+      final uri = "/suggest";
+      print("DEBUG: [PID:$pid] Posting to: ${_dio.options.baseUrl}$uri");
+
+      final response = await _dio.post(uri, 
+        data: dio.FormData.fromMap({
+          'text': text,
+          'context': contextString,
+        }),
+      );
+
+      print("DEBUG: [PID:$pid] Response received: ${response.statusCode}");
+      if (response.statusCode == 200) {
+        final suggestion = response.data['suggestion'] as String;
+        print("DEBUG: [PID:$pid] Received suggestion: '$suggestion'");
+        return suggestion;
+      }
+    } catch (e) {
+      if (e is dio.DioException && e.type == dio.DioExceptionType.cancel) {
+        // Ignore cancellation
+      } else {
+        print("DEBUG: Suggestion error: $e");
+        return "ERROR: $e";
+      }
+    }
+    return "";
   }
 
   Future<void> _requestRewrite(String text) async {

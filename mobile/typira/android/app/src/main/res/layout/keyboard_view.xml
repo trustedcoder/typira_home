@@ -5,87 +5,108 @@
     android:orientation="vertical"
     android:background="#D1D4D9">
 
-    <!-- Suggestion Strip -->
-    <HorizontalScrollView
+    <!-- Dual-Row Toolbar -->
+    <LinearLayout
+        android:id="@+id/toolbar_container"
         android:layout_width="match_parent"
-        android:layout_height="45dp"
-        android:background="#E8EAED"
-        android:requiresFadingEdge="horizontal"
-        android:scrollbars="none">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#E8EAED">
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:paddingHorizontal="8dp">
-
-            <Button
-                android:id="@+id/btn_rewrite"
-                style="?android:attr/borderlessButtonStyle"
+        <!-- Row 1: AI Action Strip (Icons) -->
+        <HorizontalScrollView
+            android:id="@+id/action_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:scrollbars="none">
+            <LinearLayout
+                android:id="@+id/action_strip"
                 android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="✨ Rewrite"
-                android:textAllCaps="false"
-                android:textColor="#444"
-                android:background="@drawable/key_background"
-                android:layout_marginEnd="8dp"/>
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="12dp">
+                
+                <ImageButton
+                    android:id="@+id/btn_hub"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_apps"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Agent Hub"
+                    android:tint="#2196F3"
+                    android:layout_marginEnd="16dp"/>
 
-            <Button
-                android:id="@+id/btn_plan"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="📅 Plan"
-                android:textAllCaps="false"
-                android:textColor="#444"
-                android:background="@drawable/key_background"
-                android:layout_marginEnd="8dp"/>
+                <ImageButton
+                    android:id="@+id/btn_rewrite_icon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_rewrite"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Rewrite"
+                    android:tint="#9C27B0"
+                    android:layout_marginEnd="16dp"/>
 
-            <Button
-                android:id="@+id/btn_remember"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="🧠 Remember"
-                android:textAllCaps="false"
-                android:textColor="#444"
-                android:background="@drawable/key_background"
-                android:layout_marginEnd="8dp"/>
+                <ImageButton
+                    android:id="@+id/btn_plan_icon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_plan"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Plan"
+                    android:tint="#4CAF50"
+                    android:layout_marginEnd="16dp"/>
 
-            <Button
-                android:id="@+id/btn_mic"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="🎙️"
-                android:textAllCaps="false"
-                android:textColor="#444"
-                android:background="@drawable/key_background"
-                android:layout_marginEnd="8dp"/>
+                <ImageButton
+                    android:id="@+id/btn_paste_icon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_paste"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Paste to Memory"
+                    android:tint="#FF9800"
+                    android:layout_marginEnd="16dp"/>
 
-            <Button
-                android:id="@+id/btn_listen"
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="🔊 Listen"
-                android:textAllCaps="false"
-                android:textColor="#444"
-                android:background="@drawable/key_background"
-                android:layout_marginEnd="8dp"/>
+                <ImageButton
+                    android:id="@+id/btn_mic_icon"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_mic"
+                    android:background="?android:attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Voice Input"
+                    android:tint="#F44336"
+                    android:layout_marginEnd="16dp"/>
+            </LinearLayout>
+        </HorizontalScrollView>
 
-            <Button
-                style="?android:attr/borderlessButtonStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="35dp"
-                android:text="Typira Suggestion..."
-                android:textAllCaps="false"
-                android:textColor="#444"
-                android:background="@drawable/key_background"
-                android:layout_marginEnd="8dp"/>
-        </LinearLayout>
-    </HorizontalScrollView>
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#D1D4D9"/>
+
+        <!-- Row 2: Automatic Suggestion Area (3-Line Vertical Scroll) -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/suggestion_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="75dp"
+            android:background="#F8F9FA"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp">
+            
+            <TextView
+                android:id="@+id/tv_suggestion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Typira is analyzing your context... (Tap to insert)"
+                android:textColor="#5F6368"
+                android:textSize="14sp"
+                android:lineSpacingExtra="4dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground"/>
+        </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
 
     <!-- Main Keyboard Area -->
     <LinearLayout
@@ -185,6 +206,20 @@
                 android:columnCount="8"
                 android:padding="4dp" />
         </ScrollView>
+
+        <!-- Agent Hub Layout Container -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/layout_agent_hub"
+            android:layout_width="match_parent"
+            android:layout_height="224dp"
+            android:visibility="gone"
+            android:padding="8dp">
+            <LinearLayout
+                android:id="@+id/container_agent_hub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </androidx.core.widget.NestedScrollView>
         
         <!-- Row 4: 123, Emoji, Space, Return -->
         <LinearLayout
