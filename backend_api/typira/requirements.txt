@@ -1,5 +1,13 @@
-fastapi
-uvicorn
-google-generativeai
-python-multipart
+Flask
+Flask-Migrate
+flask-restx
+Flask-SQLAlchemy
+flask-cors
+flask-bcrypt
 python-dotenv
+PyMySQL
+PyJWT
+sqlalchemy
+requests
+cryptography
+google-genai

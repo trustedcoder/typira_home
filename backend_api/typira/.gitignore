@@ -8,6 +8,9 @@ venv/
 .env/
 .venv/
 
+migrations
+/migrations
+
 # Flask specific
 instance/
 .webassets-cache
