@@ -51,6 +51,9 @@ class KeyboardViewController: UIInputViewController {
     var currentTask: URLSessionDataTask?
     var isLastKeyWordBoundary: Bool = false
     
+    // Ingestion
+    let historyManager = TypingHistoryManager()
+    
     deinit {
         suggestionTimer?.invalidate()
         suggestionTimer = nil
@@ -62,10 +65,27 @@ class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupKeyboardLayout()
+        
+        // Link real-time thought updates
+        historyManager.onThoughtUpdate = { [weak self] message in
+            DispatchQueue.main.async {
+                self?.suggestionLabel?.text = message
+                if message.hasPrefix("💡") {
+                    self?.suggestionLabel?.textColor = UIColor(red: 0.1, green: 0.64, blue: 0.38, alpha: 1.0) // Google Green
+                } else {
+                    self?.suggestionLabel?.textColor = UIColor(red: 0.1, green: 0.45, blue: 0.91, alpha: 1.0) // Google Blue
+                }
+            }
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        
+        // Initial Full Context Ingestion
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let after = textDocumentProxy.documentContextAfterInput ?? ""
+        historyManager.sendFullContext(before + after, proxy: textDocumentProxy)
     }
     
     func showView(_ viewType: ActiveView) {

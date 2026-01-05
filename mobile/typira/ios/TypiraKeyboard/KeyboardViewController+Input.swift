@@ -23,18 +23,27 @@ extension KeyboardViewController {
         
         switch title {
         case "space":
+             historyManager.onTextTyped(" ", proxy: proxy)
              proxy.insertText(" ")
              isLastKeyWordBoundary = true
         case "⌫":
+             // Optional: handle backspace in buffer? 
+             // For now, we skip backspace in ingestion to avoid 'corruption' 
+             // or we could implement a smarter buffer. 
+             // Let's just pass it and let the buffer handle it if we want.
              proxy.deleteBackward()
              isLastKeyWordBoundary = false 
         case "return":
+             historyManager.onTextTyped("\n", proxy: proxy)
              proxy.insertText("\n")
              isLastKeyWordBoundary = true
         default:
             if title == "123" || title == "ABC" || title == "#+=" || title == "Shift" {
                 break
             }
+            
+            // Feed to History Manager
+            historyManager.onTextTyped(title, proxy: proxy)
             
             proxy.insertText(title)
             

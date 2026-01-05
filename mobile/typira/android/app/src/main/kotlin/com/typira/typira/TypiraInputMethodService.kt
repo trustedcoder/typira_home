@@ -57,12 +57,26 @@ class TypiraInputMethodService : InputMethodService() {
     private lateinit var aiService: AIService
     private lateinit var audioService: AudioService
     private lateinit var uiManager: KeyboardUIManager
+    private lateinit var historyManager: TypingHistoryManager
 
     override fun onCreate() {
         super.onCreate()
         aiService = AIService()
         audioService = AudioService()
         uiManager = KeyboardUIManager(this)
+        historyManager = TypingHistoryManager(this) { message ->
+            android.util.Log.d("TypiraUI", "Updating Suggestion TextView: $message")
+            if (this::tvSuggestion.isInitialized) {
+                tvSuggestion.text = message
+                if (message.startsWith("�")) {
+                    tvSuggestion.setTextColor(android.graphics.Color.parseColor("#1AA260")) // Google Green for suggestions
+                } else {
+                    tvSuggestion.setTextColor(android.graphics.Color.parseColor("#1A73E8")) // Google Blue for thoughts
+                }
+            } else {
+                android.util.Log.e("TypiraUI", "tvSuggestion NOT INITIALIZED YET")
+            }
+        }
     }
 
     override fun onCreateInputView(): View {
@@ -130,35 +144,72 @@ class TypiraInputMethodService : InputMethodService() {
         uiManager.populateEmojiGrid(gridEmoji) { emoji -> onKeyClick(emoji) }
     }
 
+    private fun onKeyClick(keyText: String) {
+        val inputConnection = currentInputConnection ?: return
+        var isWordBoundary = false
+        
+        // Feed entire character to History Manager
+        historyManager.onTextTyped(keyText, currentInputEditorInfo)
+        
+        when (keyText) {
+            "⌫" -> {
+                inputConnection.deleteSurroundingText(1, 0)
+                if (contextBuffer.isNotEmpty()) contextBuffer.deleteCharAt(contextBuffer.length - 1)
+                isWordBoundary = false
+            }
+            "space" -> {
+                inputConnection.commitText(" ", 1)
+                contextBuffer.append(" ")
+                isWordBoundary = true
+            }
+            "return", "Go" -> {
+                inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+                inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+                contextBuffer.append("\n")
+                isWordBoundary = true
+            }
+            "☺" -> {
+                inputConnection.commitText("😊", 1)
+                contextBuffer.append("😊")
+                isWordBoundary = true
+            }
+            else -> {
+                inputConnection.commitText(keyText, 1)
+                contextBuffer.append(keyText)
+                if (!isSymbols && shiftState == ShiftState.ON) {
+                    shiftState = ShiftState.OFF
+                    updateShiftUI()
+                }
+                if (symbolChars.contains(keyText) || extraSymbolChars.contains(keyText)) {
+                     isWordBoundary = true
+                }
+            }
+        }
+        
+        if (contextBuffer.length > 1000) {
+            contextBuffer.delete(0, contextBuffer.length - 1000)
+        }
+
+        triggerSuggestion(isWordBoundary)
+    }
+
     private fun acceptSuggestion() {
         if (lastSuggestedCompletion.isNotEmpty()) {
-
             val extractedText = try {
-                currentInputConnection?.getExtractedText(
-                    ExtractedTextRequest(), 0
-                )
+                currentInputConnection?.getExtractedText(ExtractedTextRequest(), 0)
             } catch (e: Exception) {
                 null
             }
 
             val totalLength = extractedText?.text?.length ?: 0
-
             if (totalLength > 0) {
-                // Delete everything before and after cursor
-                currentInputConnection?.deleteSurroundingText(
-                    totalLength,   // before cursor
-                    totalLength    // after cursor
-                )
+                currentInputConnection?.deleteSurroundingText(totalLength, totalLength)
             }
 
-            // Insert suggestion
             currentInputConnection?.commitText("$lastSuggestedCompletion ", 1)
-
-            // Update internal buffer
             contextBuffer.clear()
             contextBuffer.append("$lastSuggestedCompletion ")
 
-            // Reset state
             lastSuggestedCompletion = ""
             lastTypedLength = 0
             tvSuggestion.text = "..."
@@ -172,6 +223,7 @@ class TypiraInputMethodService : InputMethodService() {
         tts?.stop()
         tts?.shutdown()
         tts = null
+        historyManager.disconnect()
     }
 
     private fun toggleEmojiView() {
@@ -193,7 +245,7 @@ class TypiraInputMethodService : InputMethodService() {
     private fun onAgentActionClick(action: String) {
         Toast.makeText(this, "Agent: $action", Toast.LENGTH_SHORT).show()
         if (action == "Rewrite") {
-            val currentText = currentInputConnection?.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)?.text?.toString() ?: ""
+            val currentText = currentInputConnection?.getExtractedText(ExtractedTextRequest(), 0)?.text?.toString() ?: ""
             if (currentText.isNotEmpty()) {
                 requestNativeRewrite(currentText)
             }
@@ -221,7 +273,6 @@ class TypiraInputMethodService : InputMethodService() {
         tvSuggestion.text = suggestion
     }
 
-    // (setupSpaceKeyTrackpad remains same - too tightly coupled to keep inline)
     private fun setupSpaceKeyTrackpad(spaceKey: View?) {
          spaceKey?.setOnTouchListener(object : View.OnTouchListener {
             private var lastX = 0f
@@ -263,7 +314,6 @@ class TypiraInputMethodService : InputMethodService() {
         })
     }
     
-    // (findLetterKeys remains same)
     private fun findLetterKeys(view: View) {
         if (view is Button) {
             val text = view.text.toString()
@@ -378,52 +428,6 @@ class TypiraInputMethodService : InputMethodService() {
         }
     }
 
-    private fun onKeyClick(keyText: String) {
-        val inputConnection = currentInputConnection ?: return
-        var isWordBoundary = false
-        
-        when (keyText) {
-            "⌫" -> {
-                inputConnection.deleteSurroundingText(1, 0)
-                if (contextBuffer.length > 0) contextBuffer.deleteCharAt(contextBuffer.length - 1)
-                isWordBoundary = false
-            }
-            "space" -> {
-                inputConnection.commitText(" ", 1)
-                contextBuffer.append(" ")
-                isWordBoundary = true
-            }
-            "return", "Go" -> {
-                inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-                inputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
-                contextBuffer.append("\n")
-                isWordBoundary = true
-            }
-            "☺" -> {
-                inputConnection.commitText("😊", 1)
-                contextBuffer.append("😊")
-                isWordBoundary = true
-            }
-            else -> {
-                inputConnection.commitText(keyText, 1)
-                contextBuffer.append(keyText)
-                if (!isSymbols && shiftState == ShiftState.ON) {
-                    shiftState = ShiftState.OFF
-                    updateShiftUI()
-                }
-                if (symbolChars.contains(keyText) || extraSymbolChars.contains(keyText)) {
-                     isWordBoundary = true
-                }
-            }
-        }
-        
-        if (contextBuffer.length > 1000) {
-            contextBuffer.delete(0, contextBuffer.length - 1000)
-        }
-
-        triggerSuggestion(isWordBoundary)
-    }
-    
     private fun triggerSuggestion(isWordBoundary: Boolean) {
         suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
         val delay = if (isWordBoundary) 600L else 1500L
@@ -433,7 +437,7 @@ class TypiraInputMethodService : InputMethodService() {
             if (text.trim().length >= 3) {
                  fetchAISuggestion(text)
             } else {
-                 tvSuggestion.text = "Typira"
+                 // Removed tvSuggestion.text = "Typira" to avoid overwriting Thought Stream
             }
         }
         
@@ -448,7 +452,6 @@ class TypiraInputMethodService : InputMethodService() {
         val prefs = getSharedPreferences("typira_memory", Context.MODE_PRIVATE)
         val memories = prefs.getStringSet("memories", setOf())?.joinToString(". ") ?: ""
 
-        // Use AI Service
         aiService.fetchSuggestion(currentText, memories, object : AIService.SuggestionCallback {
             override fun onSuccess(suggestion: String) {
                 tvSuggestion.alpha = 1.0f
@@ -485,6 +488,14 @@ class TypiraInputMethodService : InputMethodService() {
         if (this::emojiButton.isInitialized) emojiButton.text = "☺"
         if (this::modeButton.isInitialized) modeButton.text = "?123"
         if (this::shiftButton.isInitialized) updateShiftUI()
+        
+        // Initial Full Context Ingestion
+        try {
+            val fullText = currentInputConnection?.getExtractedText(ExtractedTextRequest(), 0)?.text?.toString() ?: ""
+            historyManager.sendFullContext(fullText, info)
+        } catch (e: Exception) {
+            android.util.Log.e("Typira", "Failed to grab initial context: ${e.message}")
+        }
     }
 
     private fun handleRememberAction() {

@@ -4,12 +4,14 @@ from config import config_by_name
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask.cli import FlaskGroup
+from flask_socketio import SocketIO
 
 
 db = SQLAlchemy()
 flask_bcrypt = Bcrypt()
 cors = CORS()
 flask_cli = FlaskGroup()
+socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
 
 
 def create_app(config_name):
@@ -22,5 +24,9 @@ def create_app(config_name):
     db.init_app(app)
     cors.init_app(app)
     flask_bcrypt.init_app(app)
+    socketio.init_app(app)
+
+    with app.app_context():
+        from app import socket_endpoints
 
     return app

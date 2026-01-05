@@ -17,16 +17,15 @@ class AuthBusiness:
         new_user = User(
             email=data['email'],
             password=User.generate_password(data['password']),
-            public_id=str(uuid.uuid4())
+            public_id=str(uuid.uuid4()),
+            name=data['name'],
+            fcm_token=data['fcm_token'],
         )
         db.session.add(new_user)
         db.session.commit()
 
-        response_object = {
-            'status': 1,
-            'message': 'Successfully registered.'
-        }
-        return response_object, 201
+        response_object = AuthBusiness.login_user(data)
+        return response_object
 
     @staticmethod
     def login_user(data):
@@ -36,6 +35,8 @@ class AuthBusiness:
             if user and User.check_password(user.password, data['password']):
                 auth_response = user.encode_auth_token(user.public_id)
                 if auth_response['status'] == 1:
+                    user.fcm_token = data['fcm_token']
+                    db.session.commit()
                     response_object = {
                         'status': 1,
                         'public_id': user.public_id,
@@ -60,4 +61,4 @@ class AuthBusiness:
                 'status': 0,
                 'message': f'An error occurred. Try again {e}'
             }
-            return response_object
+            return response_object,409

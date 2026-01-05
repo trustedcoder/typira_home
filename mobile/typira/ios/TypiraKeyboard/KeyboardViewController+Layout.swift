@@ -19,31 +19,52 @@ extension KeyboardViewController {
         actionScrollView.showsHorizontalScrollIndicator = false
         actionScrollView.translatesAutoresizingMaskIntoConstraints = false
         
+        // Main Container for Action Strip (Hub Left, Spacer, Tools Right)
         let actionStrip = UIStackView()
         actionStrip.axis = .horizontal
-        actionStrip.distribution = .equalSpacing
-        actionStrip.spacing = 16
+        actionStrip.alignment = .center
+        actionStrip.distribution = .fill // Important for spacer
+        actionStrip.spacing = 8
         actionStrip.translatesAutoresizingMaskIntoConstraints = false
         actionStrip.layoutMargins = UIEdgeInsets(top: 4, left: 12, bottom: 4, right: 12)
         actionStrip.isLayoutMarginsRelativeArrangement = true
         
-        let actions = [
-            (id: "hub", icon: "square.grid.2x2.fill"),
+        // 1. Hub (Left)
+        let hubBtn = createChip(actionId: "hub")
+        actionStrip.addArrangedSubview(hubBtn)
+        
+        // 2. Spacer (Middle) - Pushes tools to right
+        let spacerView = UIView()
+        spacerView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacerView.translatesAutoresizingMaskIntoConstraints = false
+        // Ensure spacer takes up available space
+        actionStrip.addArrangedSubview(spacerView)
+        NSLayoutConstraint.activate([
+            spacerView.widthAnchor.constraint(greaterThanOrEqualToConstant: 20) // Minimum separation
+        ])
+        
+        // 3. Tools (Right) - Rewrite, Paste, Mic (Plan Removed)
+        let toolsStack = UIStackView()
+        toolsStack.axis = .horizontal
+        toolsStack.spacing = 16
+        toolsStack.distribution = .fillEqually
+        
+        let toolActions = [
             (id: "rewrite", icon: "sparkles"),
-            (id: "plan", icon: "calendar"),
             (id: "paste", icon: "doc.on.clipboard"),
             (id: "mic", icon: "mic.fill")
         ]
         
-        for action in actions {
+        for action in toolActions {
             let btn = createChip(systemIcon: action.icon, actionId: action.id)
-            actionStrip.addArrangedSubview(btn)
+            toolsStack.addArrangedSubview(btn)
         }
+        actionStrip.addArrangedSubview(toolsStack)
         
         actionScrollView.addSubview(actionStrip)
         toolbarStack.addArrangedSubview(actionScrollView)
         
-        // --- ROW 2: SUGGESTION AREA ---
+        // --- ROW 2: SUGGESTION AREA (Thought Stream) ---
         let suggestionScrollView = UIScrollView()
         suggestionScrollView.showsVerticalScrollIndicator = true
         suggestionScrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -54,21 +75,39 @@ extension KeyboardViewController {
         label.lineBreakMode = .byWordWrapping
         label.font = UIFont.systemFont(ofSize: 15, weight: .regular)
         label.textColor = .darkGray
-        label.text = "Typira is analyzing your context... (Tap to insert)"
+        label.text = "Typira is thinking..."
         label.translatesAutoresizingMaskIntoConstraints = false
         label.isUserInteractionEnabled = true
         
         let tap = UITapGestureRecognizer(target: self, action: #selector(didTapSuggestionLabel(_:)))
-        // We need a wrapper to handle the tap on label since label tap target mechanism is custom
-        // Actually, we can just use a button or add gesture to label. The original code used didTapSuggestionLabel
-        // Wait, original code was: let tap = UITapGestureRecognizer(target: self, action: #selector(didTapSuggestionLabel(_:)))
-        // But didTapSuggestionLabel wasn't defined in the file I viewed? Ah, I might have missed it or it was implicit.
-        // I will map it to the handleSuggestionTap logic
         label.addGestureRecognizer(tap)
         
         self.suggestionLabel = label
         suggestionScrollView.addSubview(label)
         toolbarStack.addArrangedSubview(suggestionScrollView)
+        
+        // --- ROW 3: SMART ACTION GRID (Scrollable Chips) ---
+        let smartActionScrollView = UIScrollView()
+        smartActionScrollView.showsVerticalScrollIndicator = false
+        smartActionScrollView.showsHorizontalScrollIndicator = true
+        smartActionScrollView.translatesAutoresizingMaskIntoConstraints = false
+        smartActionScrollView.backgroundColor = UIColor(red: 240/255, green: 242/255, blue: 245/255, alpha: 1.0)
+        
+        // Container for Smart Chips
+        let smartActionStack = UIStackView()
+        smartActionStack.axis = .horizontal
+        smartActionStack.spacing = 8
+        smartActionStack.alignment = .center
+        smartActionStack.translatesAutoresizingMaskIntoConstraints = false
+        
+        let smartStatusLabel = UILabel()
+        smartStatusLabel.text = "Waiting for intent..."
+        smartStatusLabel.font = UIFont.italicSystemFont(ofSize: 12)
+        smartStatusLabel.textColor = .systemGray
+        smartActionStack.addArrangedSubview(smartStatusLabel)
+        
+        smartActionScrollView.addSubview(smartActionStack)
+        toolbarStack.addArrangedSubview(smartActionScrollView)
         
         // --- MAIN AREA ---
         let mainStack = UIStackView()
@@ -84,14 +123,25 @@ extension KeyboardViewController {
             toolbarStack.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
             toolbarStack.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
             
-            actionScrollView.heightAnchor.constraint(equalToConstant: 44),
+            // Row 1 Height Increased to 60
+            actionScrollView.heightAnchor.constraint(equalToConstant: 60),
             actionStrip.topAnchor.constraint(equalTo: actionScrollView.topAnchor),
             actionStrip.leadingAnchor.constraint(equalTo: actionScrollView.leadingAnchor),
             actionStrip.trailingAnchor.constraint(equalTo: actionScrollView.trailingAnchor),
             actionStrip.bottomAnchor.constraint(equalTo: actionScrollView.bottomAnchor),
             actionStrip.heightAnchor.constraint(equalTo: actionScrollView.heightAnchor),
+            actionStrip.widthAnchor.constraint(equalTo: actionScrollView.widthAnchor),
             
-            suggestionScrollView.heightAnchor.constraint(equalToConstant: 75),
+            // Row 2: Smart Action Grid (50 height)
+            smartActionScrollView.heightAnchor.constraint(equalToConstant: 50),
+            smartActionStack.topAnchor.constraint(equalTo: smartActionScrollView.topAnchor),
+            smartActionStack.leadingAnchor.constraint(equalTo: smartActionScrollView.leadingAnchor, constant: 12),
+            smartActionStack.trailingAnchor.constraint(equalTo: smartActionScrollView.trailingAnchor, constant: -12),
+            smartActionStack.bottomAnchor.constraint(equalTo: smartActionScrollView.bottomAnchor),
+            smartActionStack.heightAnchor.constraint(equalTo: smartActionScrollView.heightAnchor),
+
+            // Row 3: Suggestion Text Box (60 height)
+            suggestionScrollView.heightAnchor.constraint(equalToConstant: 60),
             label.topAnchor.constraint(equalTo: suggestionScrollView.topAnchor, constant: 8),
             label.leadingAnchor.constraint(equalTo: suggestionScrollView.leadingAnchor, constant: 12),
             label.trailingAnchor.constraint(equalTo: suggestionScrollView.trailingAnchor, constant: -12),
@@ -244,7 +294,22 @@ extension KeyboardViewController {
     func createChip(title: String? = nil, systemIcon: String? = nil, actionId: String? = nil) -> UIButton {
         let btn = UIButton(type: .system)
         
-        if let iconName = systemIcon {
+        if actionId == "hub" {
+            let image = UIImage(named: "ic_ai_custom")?.withRenderingMode(.alwaysOriginal)
+            btn.setImage(image, for: .normal)
+            btn.imageView?.contentMode = .scaleAspectFit
+            btn.contentHorizontalAlignment = .fill
+            btn.contentVerticalAlignment = .fill
+            
+            // Set fixed size for the Hub button to match parent/row height approx
+            btn.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                btn.widthAnchor.constraint(equalToConstant: 70),
+                btn.heightAnchor.constraint(equalToConstant: 70)
+            ])
+            
+            btn.accessibilityIdentifier = actionId
+        } else if let iconName = systemIcon {
             if #available(iOS 13.0, *) {
                 let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
                 let image = UIImage(systemName: iconName, withConfiguration: config)

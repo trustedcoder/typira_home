@@ -11,3 +11,5 @@ sqlalchemy
 requests
 cryptography
 google-genai
+Flask-SocketIO
+eventlet

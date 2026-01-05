@@ -23,4 +23,5 @@ if __name__ == "__main__":
     except IndexError:
         argument = ""
     if argument == "run":
-        app.run(host="127.0.0.1", port=7009, debug=True)
+        from app import socketio
+        socketio.run(app, host="0.0.0.0", port=7009, debug=True)

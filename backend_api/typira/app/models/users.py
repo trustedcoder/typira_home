@@ -13,6 +13,8 @@ class User(db.Model):
     email = db.Column(db.String(225), unique=True, nullable=True)
     password = db.Column(db.String(225), nullable=True)
     is_email_verified = db.Column(db.Boolean, default=False)
+    name = db.Column(db.String(225), nullable=True)
+    fcm_token = db.Column(db.Text, nullable=True)
 
     def __repr__(self):
         return "{}".format(self.email)

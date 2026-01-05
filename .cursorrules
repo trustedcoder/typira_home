@@ -7,50 +7,40 @@
 - Commit messages should be semantic (e.g., `feat:`, `fix:`, `chore:`, `refactor:`).
 - When a task is assigned, only perform that specific task. Do not start working on other tasks without prior approval.
 
-# Flutter & Dart Rules (Path: mobile/)
+# Flutter & Dart Rules (Path: mobile/typira/lib/)
+- **State Management**: Use **GetX** exclusively for state management, dependency injection, and route management.
+- **Project Structure**:
+    - `activities/`: UI Screens. File names should end with `_activity.dart` (e.g., `splash_activity.dart`, `login_activity.dart`). Class names should end with `Activity` (e.g., `SplashActivity`).
+    - `controllers/`: Logic and State. File names should match the feature (e.g., `life_cycle.dart`). Class names should end with `Controller` (e.g., `LifeCycleController`).
+    - `api/`: Network calls and repositories.
+    - `models/`: Data models.
+    - `constants/`: App-wide constants and themes.
+- **Responsiveness**: Use `flutter_screenutil` for all UI sizing.
+    - Use `.w` for width, `.h` for height, `.sp` for fonts, `.r` for radius.
 - **Strong Typing**: Always use strong types. Avoid `dynamic` unless absolutely necessary.
 - **Const Correctness**: Use `const` constructors for widgets and value objects whenever possible.
-- **Null Safety**: Embrace null safety. Use `?`, `!`, and `late` appropriately, but prefer safe access `?.` and defaults `??` over force unwrapping `!`.
+- **Null Safety**: Embrace null safety. Use `?`, `!`, and `late` appropriately.
 - **Async/Await**: Prefer `async`/`await` over raw `Future` and `.then()`.
-- **Widget Structure**: 
-  - Break down large widgets into smaller, reusable components.
-  - Use `StatelessWidget` by default; use `StatefulWidget` only when maintaining local state is required.
-- **State Management**: Make use of Getx only.
-- **Imports**: Prefer absolute imports `package:typira/...` over relative imports `../../`.
 
-# Python Rules (Path: backend_api/)
+# Python Rules (Path: backend_api/typira/app/)
+- **Framework**: Use **Flask-RestX** (via `flask_restx`).
+- **Project Structure**:
+    - `app/`: Main application package.
+    - `app/__init__.py`: Application factory function `create_app`.
+    - `app/api.py`: `Api` object creation and Namespace registration.
+    - `app/endpoints/`: API Controllers/Resources. Define `Namespace` here (e.g., `ns = Namespace("auth", ...)`).
+    - `app/business/`: Service Layer. Contains all business logic (database operations, processing). Data should be passed from `endpoints` to `business` functions.
+    - `app/models/`: SQLAlchemy models.
+    - `app/util/`: Helper utilities (DTOs, decorators).
 - **PEP 8**: Follow standard PEP 8 style guidelines.
 - **Type Hinting**: Use Python type hints (`typing` module) for all function arguments and return values.
-- **Docstrings**: Include docstrings for all public modules, classes, and methods (Google or NumPy style).
-- **Error Handling**: Use explicit `try-except` blocks. Avoid bare `except:`.
-- **Virtual Env**: Assume a virtual environment is active.
-- **Modern Python**: Use modern Python 3.10+ features (e.g., match statements, union types `|`).
+- **Error Handling**: Use explicit `try-except` blocks.
 
 # Hybrid Architecture Policy (Keyboard)
 - **Native-First for Keyboard**: To ensure maximum reliability, zero-latency typing, and minimal memory usage, **ALL** core keyboard features (Rendering, Input Handling, Suggestions, Rewriting, Voice) MUST be implemented using native code (Swift for iOS, Kotlin for Android) within the keyboard extension/service context.
 - **Native Networking**: Use native networking (URLSession on iOS, OkHttp on Android) for all real-time keyboard actions to bypass bridge overhead and prevent connection timeouts.
-- **Flutter for Dashboards & Complex Apps**: The Flutter layer remains the primary engine for the main "Typeira" application, user-facing dashboards, complex settings, and long-form AI interactions.
-- **Memory Conservation**: Be extremely cautious with resource usage in the Native Keyboard layer. Avoid loading large assets or initializing the FlutterEngine in the background extension unless strictly necessary (prefer native solutions for the extension).
-
-# Project Structure specific
-- `backend_api/`: Python backend code.
-- `mobile//typira/`: Main project directory.
-- `mobile//typira/android/`: Native Android keyboard implementation (InputMethodService).
-- `mobile//typira/ios/`: Native iOS keyboard implementation (Keyboard Extension).
-- `mobile//typira/lib/`: Flutter code for Dashboard, Memory, and AI Logic.
-
-# Agent Hub & Contextual Architecture
-- **Categorization**: Agent actions must be grouped into **Generation**, **Productivity**, and **Insights**.
-- **Contextual Awareness**: The keyboard should not just be passive. Use typing history (via backend `/analyze-intent`) to proactively suggest actions.
-- **Hybrid Notification Policy**:
-  - **Inline**: Use "Smart Toasts" or "Bubbles" for immediate text-based actions.
-  - **App-Level**: Use System Notifications for complex actions that require the full Typira App (e.g., long-form article writing, goal setup).
-- **Scalability**: The Agent Hub MUST use a dynamic grid (Collection/RecyclerView) to allow adding new agentic tools (image-to-text, productivity tips, etc.) without redesigning the UI.
+- **Flutter for Dashboards**: The Flutter layer remains the primary engine for the main "Typeira" application, user-facing dashboards, complex settings, and long-form AI interactions.
 
 # Memory Stewardship & Cleanup
-- **Proactive Cancellation**: Always use `CancelToken` (Dart) or `URLSessionTask.cancel()` (Swift) or `Call.cancel()` (Kotlin) to abort obsolete background tasks (especially network requests) immediately as new input arrives.
-- **Nullification**: Set large objects, media buffers, or temporary file paths to `null`/`nil` as soon as their functional lifecycle ends.
-- **Weak References**: Use `[weak self]` in Swift closures and avoid passing raw `Activity`/`Context` pointers into long-lived background threads in Android to prevent retain cycles.
-- **Explicit Disposal**: Always override `onDestroy` (Android), `deinit` (iOS), and `onClose` (GetX/Dart) to invalidate timers, close streams, and clear caches.
-- **Minimal Buffers**: Use sliding windows or fixed-size limits for all historical text buffers or caches to prevent unbounded RAM growth.
-
+- **Proactive Cancellation**: Always use `CancelToken` (Dart) or `URLSessionTask.cancel()` (Swift) or `Call.cancel()` (Kotlin) to abort obsolete background tasks.
+- **Resource Cleanup**: Explicitly dispose streams, controllers, and timers in `onClose`/`onDestroy`/`deinit`.
