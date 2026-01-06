@@ -7,7 +7,7 @@ from google.genai import types
 class GeminiBusiness:
     # Initialize Gemini
     client = genai.Client()
-    model_name = 'gemini-2.5-flash-lite'
+    model_name = 'gemini-3-flash-preview'
 
     @staticmethod
     def speech_to_text(audio_file):
@@ -116,31 +116,56 @@ Sentence:"""
             return {"suggestion": ""}
 
     @staticmethod
-    def canonicalize_sentence(sentence: str):
+    def analyze_context(text: str, history: list, app_context: str):
         """
-        Uses Gemini to identify the 'Semantic Intent' of a sentence.
-        Returns a canonical label for deduplication.
+        Agentic Brain: Analyzes current text + full semantic history.
+        Returns a JSON with 'thoughts' (list) and 'actions' (list of {id, label}).
         """
         try:
-            # More strict prompt for determinism
-            prompt = f"""Identify the core 'Semantic Intent' of the following sentence. 
-Rules:
-1. Return a single, short, capitalized label (snake_case). 
-2. Be highly consistent: if the sentence means the same thing, the label must be EXACTLY the same.
-3. Remove specific fluff (e.g. "I want to eat rice" -> EAT_RICE, "I'm eating rice" -> EAT_RICE).
-4. For general chat, return a simple summary (e.g. GREETING).
+            history_block = "\n".join([f"- {h}" for h in history])
+            
+            prompt = f"""You are 'Typira Agent', a proactive AI companion integrated into a smartphone keyboard.
+Your goal is to anticipate the user's needs based on their current typing AND their deep typing history.
 
-Sentence: "{sentence}"
+USER HISTORY (Top Intents/Frequent Topics):
+{history_block}
 
-Canonical Label:"""
+CURRENT APP CONTEXT: {app_context}
+USER IS CURRENTLY TYPING: "{text}"
+
+INSTRUCTIONS:
+1. Analyze the 'Inferred Intent' of the user's current text.
+2. Cross-reference with their 'History' to find patterns or relevant topics.
+3. Formulate a multi-step 'Thought Process' describing what you are doing.
+4. If a clear task is detected (e.g. scheduling, drafting, searching, calculation), suggest 2-4 'Proactive Actions'.
+
+OUTPUT FORMAT (Strict JSON):
+{{
+  "thoughts": ["Initial observation...", "History lookup result...", "Intent confirmed..."],
+  "final_thought": "Short summary of your conclusion for the user.",
+  "actions": [
+    {{"id": "suggest_draft", "label": "✍️ Draft Response"}},
+    {{"id": "schedule_event", "label": "📅 Schedule meeting"}}
+  ]
+}}
+
+Return ONLY the JSON object."""
             
             response = GeminiBusiness.client.models.generate_content(
                 model=GeminiBusiness.model_name,
-                contents=prompt
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json'
+                )
             )
-            label = response.text.strip().upper().replace(" ", "_").replace('"', '')
-            print(f"DEBUG: [Gemini] Canonical Label: '{label}' for sentence: '{sentence}'")
-            return label
+            
+            import json
+            return json.loads(response.text)
         except Exception as e:
-            print(f"Canonicalization Error: {e}")
-            return sentence.upper() # Fallback
+            print(f"Agentic Analysis Error: {e}")
+            return {
+                "thoughts": ["Analyzing context..."],
+                "final_thought": "Agent is active.",
+                "actions": []
+            }
+

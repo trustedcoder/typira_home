@@ -104,43 +104,29 @@ def handle_analyze(data):
         1, text, app_context, is_full
     )
 
-    # Analysis logic continues...
+    # --- Agentic AI Suggestion Engine (Gemini 3) ---
+    from app.business.gemini_business import GeminiBusiness
     
-    emit('thought_update', {'text': 'Agent is listening...'})
-    print(text)
-    print(f"Agent is listening: {app_context}")
-    socketio.sleep(3)
-    print(f"Agent is listeningv: {app_context}")
+    # 1. Gather Personal Context from TypingHistory
+    # Get top 30 most frequent intents
+    frequent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.frequency.desc()).limit(30).all()
+    # Get last 20 recent sentences
+    recent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.timestamp.desc()).limit(20).all()
     
-    if "meeting" in text.lower() or "schedule" in text.lower():
-        socketio.sleep(3)
-        emit('thought_update', {'text': 'I detect a scheduling intent...'})
-        socketio.sleep(3)
-        emit('thought_update', {'text': 'Checking your calendar for availability...'})
-        socketio.sleep(3)
-        emit('suggestion_ready', {
-            'thought': 'I found a slot tomorrow at 10 AM. Should I draft the invite?',
-            'actions': [
-                {'id': 'draft_invite', 'label': '📅 Draft Invite'},
-                {'id': 'check_cal', 'label': '🔎 Check Calendar'},
-                {'id': 'check_cal', 'label': '🔎 Check Calendar'},
-                {'id': 'check_cal', 'label': '🔎 Check Calendar'},
-                {'id': 'check_cal', 'label': '🔎 Check Calendar'}
-            ]
-        })
-    elif "draft" in text.lower() or "email" in text.lower():
-        emit('thought_update', {'text': 'Synthesizing email context...'})
-        socketio.sleep(3)
-        emit('suggestion_ready', {
-            'thought': 'I can draft this email for you based on our previous history.',
-            'actions': [
-                {'id': 'draft_email', 'label': '✉️ Draft Email'},
-                {'id': 'make_formal', 'label': '👔 Make Formal'}
-            ]
-        })
-    else:
-        emit('thought_update', {'text': 'Tracking context for future actions...'})
-        emit('suggestion_ready', {
-            'thought': 'Agent is active in the background.',
-            'actions': []
-        })
+    combined_history = list(set([h.content for h in frequent_history] + [h.content for h in recent_history]))
+    
+    # 2. Call the Agentic Brain
+    analysis = GeminiBusiness.analyze_context(text, combined_history, app_context)
+    
+    # 3. Stream 'Thought Process' to UI
+    thoughts = analysis.get('thoughts', [])
+    for thought in thoughts:
+        emit('thought_update', {'text': thought})
+        socketio.sleep(10) # Allow user to read the thinking process
+        
+    # 4. Finalize and Show Actions
+    emit('thought_update', {'text': analysis.get('final_thought', 'Ready.')})
+    emit('suggestion_ready', {
+        'thought': analysis.get('final_thought', ''),
+        'actions': analysis.get('actions', [])
+    })

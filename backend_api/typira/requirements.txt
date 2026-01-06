@@ -13,3 +13,4 @@ cryptography
 google-genai
 Flask-SocketIO
 eventlet
+simhash
