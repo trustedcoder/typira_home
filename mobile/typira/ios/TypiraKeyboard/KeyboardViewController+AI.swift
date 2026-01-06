@@ -92,6 +92,10 @@ extension KeyboardViewController {
             handleMicAction()
         } else if actionId == "hub" {
             showView(.agent)
+        } else {
+            // Smart AI Action
+            NSLog("Smart AI Action Triggered: \(actionId ?? "none") with title: \(title)")
+            // Future: Handoff to Week 2/3 logic
         }
     }
     

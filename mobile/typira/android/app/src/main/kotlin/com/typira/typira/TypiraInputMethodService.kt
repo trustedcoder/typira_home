@@ -43,6 +43,8 @@ class TypiraInputMethodService : InputMethodService() {
     private lateinit var containerAgentHub: android.widget.LinearLayout
     private lateinit var gridEmoji: android.widget.GridLayout
     private lateinit var tvSuggestion: android.widget.TextView
+    private lateinit var smartActionContainer: android.widget.LinearLayout
+    private lateinit var tvSmartStatus: android.widget.TextView
     
     // Logic
     private val suggestionHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -64,7 +66,7 @@ class TypiraInputMethodService : InputMethodService() {
         aiService = AIService()
         audioService = AudioService()
         uiManager = KeyboardUIManager(this)
-        historyManager = TypingHistoryManager(this) { message ->
+        historyManager = TypingHistoryManager(this, { message ->
             android.util.Log.d("TypiraUI", "Updating Suggestion TextView: $message")
             if (this::tvSuggestion.isInitialized) {
                 tvSuggestion.text = message
@@ -73,10 +75,11 @@ class TypiraInputMethodService : InputMethodService() {
                 } else {
                     tvSuggestion.setTextColor(android.graphics.Color.parseColor("#1A73E8")) // Google Blue for thoughts
                 }
-            } else {
-                android.util.Log.e("TypiraUI", "tvSuggestion NOT INITIALIZED YET")
             }
-        }
+        }, { actions ->
+            android.util.Log.d("TypiraUI", "Received ${actions.length()} actions for rendering")
+            renderActionChips(actions)
+        })
     }
 
     override fun onCreateInputView(): View {
@@ -89,7 +92,44 @@ class TypiraInputMethodService : InputMethodService() {
         containerAgentHub = view.findViewById(R.id.container_agent_hub)
         uiManager.createAgentHub(containerAgentHub, { showKeyboardState(KeyboardState.MAIN) }, { action -> onAgentActionClick(action) })
         
+        tvSuggestion = view.findViewById(R.id.tv_suggestion)
+        smartActionContainer = view.findViewById(R.id.smart_action_container)
+        tvSmartStatus = view.findViewById(R.id.tv_smart_status)
+        
         return view
+    }
+
+    private fun renderActionChips(actions: org.json.JSONArray) {
+        if (!this::smartActionContainer.isInitialized) return
+        
+        smartActionContainer.removeAllViews()
+        
+        if (actions.length() == 0) {
+            smartActionContainer.addView(tvSmartStatus)
+            return
+        }
+        
+        for (i in 0 until actions.length()) {
+            val action = actions.getJSONObject(i)
+            val label = action.getString("label")
+            val actionId = action.getString("id")
+            
+            val button = Button(this).apply {
+                text = label
+                textSize = 12f
+                isAllCaps = false
+                val params = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.setMargins(0, 0, 8, 0)
+                layoutParams = params
+                setOnClickListener {
+                    onAgentActionClick(actionId)
+                }
+            }
+            smartActionContainer.addView(button)
+        }
     }
 
     private fun setupTTS() {

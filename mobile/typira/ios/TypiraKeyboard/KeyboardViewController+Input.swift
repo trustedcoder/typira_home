@@ -69,9 +69,37 @@ extension KeyboardViewController {
     
     override func textWillChange(_ textInput: UITextInput?) {}
     override func textDidChange(_ textInput: UITextInput?) {
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let after = textDocumentProxy.documentContextAfterInput ?? ""
+        let fullContent = before + after
+        
+        // Dynamic Full Context Ingestion
+        // Check if length changed (grew OR shrank - revealing/deleting) or content shifted
+        if !fullContent.isEmpty && (fullContent.count != lastSyncedContext.count || !fullContent.contains(lastSyncedContext)) {
+            
+            let capturedAtTrigger = fullContent
+            let oldSyncLen = lastSyncedContext.count
+            lastSyncedContext = capturedAtTrigger // Anticipatory update
+            
+            NSLog("DEBUG: [iOSContext] Potential context reveal (Old: \(oldSyncLen), Current: \(capturedAtTrigger.count)). Checking in 0.6s...")
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                guard let self = self else { return }
+                let finalBefore = self.textDocumentProxy.documentContextBeforeInput ?? ""
+                let finalAfter = self.textDocumentProxy.documentContextAfterInput ?? ""
+                let finalFull = finalBefore + finalAfter
+                
+                // If the system revealed more or different text than we last synced
+                if finalFull != self.lastSyncedContext {
+                    NSLog("DEBUG: [iOSContext] SYNCING: Found \(finalFull.count) total chars (Before: \(finalBefore.count), After: \(finalAfter.count))")
+                    self.historyManager.sendFullContext(finalFull, proxy: self.textDocumentProxy)
+                    self.lastSyncedContext = finalFull
+                }
+            }
+        }
+
         // Trigger suggestion logic when text changes
-        let context = textDocumentProxy.documentContextBeforeInput ?? ""
-        if context.isEmpty {
+        if before.isEmpty {
             suggestionLabel?.text = "Start typing for AI suggestions..."
             return
         }
@@ -82,7 +110,7 @@ extension KeyboardViewController {
         let delay = isLastKeyWordBoundary ? 0.6 : 1.5
         
         suggestionTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
-            self?.fetchAISuggestion(for: context)
+            self?.fetchAISuggestion(for: before)
         }
     }
 

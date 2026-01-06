@@ -121,7 +121,7 @@
             android:layout_height="50dp"
             android:background="#F0F2F5"
             android:scrollbars="none">
-            
+
             <LinearLayout
                 android:id="@+id/smart_action_container"
                 android:layout_width="wrap_content"

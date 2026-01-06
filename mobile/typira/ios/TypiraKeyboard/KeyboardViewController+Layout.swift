@@ -95,12 +95,14 @@ extension KeyboardViewController {
         
         // Container for Smart Chips
         let smartActionStack = UIStackView()
+        self.smartActionStack = smartActionStack
         smartActionStack.axis = .horizontal
         smartActionStack.spacing = 8
         smartActionStack.alignment = .center
         smartActionStack.translatesAutoresizingMaskIntoConstraints = false
         
         let smartStatusLabel = UILabel()
+        self.smartStatusLabel = smartStatusLabel
         smartStatusLabel.text = "Waiting for intent..."
         smartStatusLabel.font = UIFont.italicSystemFont(ofSize: 12)
         smartStatusLabel.textColor = .systemGray

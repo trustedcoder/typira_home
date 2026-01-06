@@ -43,6 +43,8 @@ class KeyboardViewController: UIInputViewController {
     var shiftButton: UIButton?
     var modeButton: UIButton?
     var suggestionLabel: UILabel?
+    var smartActionStack: UIStackView?
+    var smartStatusLabel: UILabel?
     
     // Smart Suggestion Logic
     var lastSuggestedCompletion: String = ""
@@ -53,6 +55,7 @@ class KeyboardViewController: UIInputViewController {
     
     // Ingestion
     let historyManager = TypingHistoryManager()
+    var lastSyncedContext: String = ""
     
     deinit {
         suggestionTimer?.invalidate()
@@ -77,15 +80,39 @@ class KeyboardViewController: UIInputViewController {
                 }
             }
         }
+        historyManager.onActionsReceived = { [weak self] actions in
+            DispatchQueue.main.async {
+                self?.renderActionChips(actions: actions)
+            }
+        }
+    }
+    
+    func renderActionChips(actions: [[String: Any]]) {
+        guard let stack = self.smartActionStack else { return }
+        
+        // Clear children
+        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        if actions.isEmpty {
+            if let status = self.smartStatusLabel {
+                stack.addArrangedSubview(status)
+            }
+            return
+        }
+        
+        for action in actions {
+            guard let label = action["label"] as? String,
+                  let id = action["id"] as? String else { continue }
+            
+            let btn = createChip(title: label, actionId: id)
+            stack.addArrangedSubview(btn)
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        
-        // Initial Full Context Ingestion
-        let before = textDocumentProxy.documentContextBeforeInput ?? ""
-        let after = textDocumentProxy.documentContextAfterInput ?? ""
-        historyManager.sendFullContext(before + after, proxy: textDocumentProxy)
+        // Reset state so we can detect focus on new fields
+        lastSyncedContext = ""
     }
     
     func showView(_ viewType: ActiveView) {

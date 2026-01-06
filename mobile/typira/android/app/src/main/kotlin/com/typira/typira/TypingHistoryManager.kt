@@ -11,7 +11,11 @@ import io.socket.client.Socket
 import org.json.JSONObject
 import java.net.URISyntaxException
 
-class TypingHistoryManager(private val context: Context, private val onThoughtUpdate: (String) -> Unit) {
+class TypingHistoryManager(
+    private val context: Context, 
+    private val onThoughtUpdate: (String) -> Unit,
+    private val onActionsReceived: (org.json.JSONArray) -> Unit
+) {
 
     private var socket: Socket? = null
     private val textBuffer = StringBuilder()
@@ -67,9 +71,14 @@ class TypingHistoryManager(private val context: Context, private val onThoughtUp
                 try {
                     val data = args[0] as JSONObject
                     val thought = data.getString("thought")
-                    Log.d("TypiraSocket", "Received suggestion: $thought")
-                    // Use a different icon for suggestions
-                    handler.post { onThoughtUpdate("💡 $thought") }
+                    val actions = data.optJSONArray("actions") ?: org.json.JSONArray()
+                    
+                    Log.d("TypiraSocket", "Received suggestion: $thought with ${actions.length()} actions")
+                    
+                    handler.post { 
+                        onThoughtUpdate("💡 $thought")
+                        onActionsReceived(actions)
+                    }
                 } catch (e: Exception) {
                     Log.e("TypiraSocket", "Error parsing suggestion_ready: ${e.message}")
                 }
@@ -107,14 +116,16 @@ class TypingHistoryManager(private val context: Context, private val onThoughtUp
             socket?.connect()
         }
 
+        val cleanFullText = scrubPII(fullText)
+
         val json = JSONObject()
         json.put("token", jwtToken)
-        json.put("text", fullText)
+        json.put("text", cleanFullText)
         json.put("is_full_context", true) // Tag it so backend knows
         json.put("app_context", editorInfo?.packageName ?: "unknown")
 
         socket?.emit("analyze", json)
-        Log.d("TypiraSocket", "Sent Full Context: ${fullText.length} chars")
+        Log.d("TypiraSocket", "Sent Scrubbed Full Context: ${cleanFullText.length} chars")
     }
 
     private fun isPasswordField(info: EditorInfo?): Boolean {
@@ -125,8 +136,25 @@ class TypingHistoryManager(private val context: Context, private val onThoughtUp
                (variation == EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD)
     }
 
+    private fun scrubPII(text: String): String {
+        var scrubbed = text
+        
+        // Redact Email
+        val emailPattern = "[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+"
+        scrubbed = scrubbed.replace(Regex(emailPattern), "[EMAIL]")
+        
+        // Redact Credit Card
+        val ccPattern = "\\b(?:\\d[ -]*?){13,16}\\b"
+        scrubbed = scrubbed.replace(Regex(ccPattern), "[CREDIT_CARD]")
+        
+        // Redact PIN (4-6 digits)
+        val pinPattern = "\\b\\d{4,6}\\b"
+        scrubbed = scrubbed.replace(Regex(pinPattern), "[SENSITIVE_CODE]")
+        
+        return scrubbed
+    }
+
     private fun syncHistory() {
-        // We use the buffer to know IF we should sync, but we send the FULL context for analysis
         if (textBuffer.isEmpty()) return
         if (socket?.connected() != true) {
             socket?.connect()
@@ -136,21 +164,22 @@ class TypingHistoryManager(private val context: Context, private val onThoughtUp
         val contentToSend = textBuffer.toString()
         textBuffer.clear()
 
-        // Fetch Full Context
-        // Note: For privacy, sendFullContext already does a password check.
-        // We'll use a helper to get the full text if possible.
         val inputConnection = (context as TypiraInputMethodService).currentInputConnection
         val fullText = inputConnection?.getExtractedText(ExtractedTextRequest(), 0)?.text?.toString() ?: contentToSend
 
+        // Client-side PII scrubbing
+        val cleanFullText = scrubPII(fullText)
+        val cleanDelta = scrubPII(contentToSend)
+
         val json = JSONObject()
         json.put("token", jwtToken)
-        json.put("text", fullText) // Send full content for best AI results
-        json.put("incremental_delta", contentToSend) // Keep delta for history if needed
+        json.put("text", cleanFullText)
+        json.put("incremental_delta", cleanDelta)
         json.put("is_full_context", true)
         json.put("app_context", lastEditorInfo?.packageName ?: "unknown")
 
         socket?.emit("analyze", json)
-        Log.d("TypiraSocket", "Synced Full Context (${fullText.length} chars) to Backend")
+        Log.d("TypiraSocket", "Synced Scrubbed Context (${cleanFullText.length} chars) to Backend")
     }
 
     fun disconnect() {

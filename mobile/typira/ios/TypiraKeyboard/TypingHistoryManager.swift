@@ -10,6 +10,7 @@ class TypingHistoryManager {
     private let debounceDelay: TimeInterval = 2.0
     
     var onThoughtUpdate: ((String) -> Void)?
+    var onActionsReceived: (([[String: Any]]) -> Void)?
     
     // App Group for sharing JWT token with Flutter app
     private let appGroupSuiteName: String? = nil 
@@ -44,7 +45,9 @@ class TypingHistoryManager {
         
         socket?.on("suggestion_ready") { [weak self] data, ack in
             if let dict = data[0] as? [String: Any], let thought = dict["thought"] as? String {
+                let actions = dict["actions"] as? [[String: Any]] ?? []
                 self?.onThoughtUpdate?("💡 \(thought)")
+                self?.onActionsReceived?(actions)
             }
         }
         
@@ -68,10 +71,33 @@ class TypingHistoryManager {
         }
     }
     
+    private func scrubPII(_ text: String) -> String {
+        var scrubbed = text
+        
+        // Redact Email
+        let emailPattern = "[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+"
+        scrubbed = applyRegex(pattern: emailPattern, replacement: "[EMAIL]", to: scrubbed)
+        
+        // Redact Credit Card
+        let ccPattern = "\\b(?:\\d[ -]*?){13,16}\\b"
+        scrubbed = applyRegex(pattern: ccPattern, replacement: "[CREDIT_CARD]", to: scrubbed)
+        
+        // Redact PIN (4-6 digits)
+        let pinPattern = "\\b\\d{4,6}\\b"
+        scrubbed = applyRegex(pattern: pinPattern, replacement: "[SENSITIVE_CODE]", to: scrubbed)
+        
+        return scrubbed
+    }
+    
+    private func applyRegex(pattern: String, replacement: String, to text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return text }
+        let range = NSRange(location: 0, length: text.utf16.count)
+        return regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: replacement)
+    }
+
     private func syncHistory(proxy: UITextDocumentProxy) {
         guard !textBuffer.isEmpty else { return }
         
-        // We use the buffer to know IF we should sync, but we send the FULL context for analysis
         let incrementalDelta = textBuffer
         textBuffer = ""
         
@@ -79,16 +105,20 @@ class TypingHistoryManager {
         let after = proxy.documentContextAfterInput ?? ""
         let fullText = before + after
         
+        // Client-side PII scrubbing
+        let cleanFullText = scrubPII(fullText)
+        let cleanDelta = scrubPII(incrementalDelta)
+        
         let payload: [String: Any] = [
             "token": jwtToken ?? "",
-            "text": fullText,
-            "incremental_delta": incrementalDelta,
+            "text": cleanFullText,
+            "incremental_delta": cleanDelta,
             "is_full_context": true,
             "app_context": "ios.extension.keyboard"
         ]
         
         socket?.emit("analyze", payload)
-        NSLog("DEBUG: [TypiraSocket] Synced Full Context (\(fullText.count) chars) to Backend")
+        NSLog("DEBUG: [TypiraSocket] Synced Scrubbed Context (\(cleanFullText.count) chars) to Backend")
     }
 
     func sendFullContext(_ fullText: String, proxy: UITextDocumentProxy) {
@@ -96,14 +126,16 @@ class TypingHistoryManager {
             return
         }
         
+        let cleanFullText = scrubPII(fullText)
+        
         let payload: [String: Any] = [
             "token": jwtToken ?? "",
-            "text": fullText,
+            "text": cleanFullText,
             "is_full_context": true,
             "app_context": "ios.extension.keyboard"
         ]
         
         socket?.emit("analyze", payload)
-        NSLog("DEBUG: [TypiraSocket] Emitting 'full_context' for \(fullText.count) chars")
+        NSLog("DEBUG: [TypiraSocket] Emitting scrubbed 'full_context' for \(cleanFullText.count) chars")
     }
 }
