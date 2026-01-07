@@ -144,10 +144,23 @@ OUTPUT FORMAT (Strict JSON):
   "thoughts": ["Initial observation...", "History lookup result...", "Intent confirmed..."],
   "final_thought": "Short summary of your conclusion for the user.",
   "actions": [
-    {{"id": "suggest_draft", "label": "✍️ Draft Response"}},
-    {{"id": "schedule_event", "label": "📅 Schedule meeting"}}
+    {{
+      "id": "draft_invite", 
+      "label": "✍️ Draft Response", 
+      "type": "prompt_trigger", 
+      "payload": "Please draft a polite lunch invitation based on my schedule."
+    }},
+    {{
+      "id": "show_map", 
+      "label": "📍 Show on Map", 
+      "type": "deep_link", 
+      "payload": "maps://?q=Lagos+Restaurants"
+    }}
   ]
 }}
+
+- For system tasks (Search, Maps, Browser), use 'type': 'deep_link' with a valid URL scheme or URL as 'payload'.
+- For iterative AI tasks (Drafting, Rewriting, Formalizing), use 'type': 'prompt_trigger' with a specific instruction as 'payload'.
 
 Return ONLY the JSON object."""
             
@@ -168,4 +181,45 @@ Return ONLY the JSON object."""
                 "final_thought": "Agent is active.",
                 "actions": []
             }
+
+    @staticmethod
+    def perform_agentic_action(action_id: str, payload: str, context: str, history: list):
+        """
+        Executes a specific agentic task (Step 2 of the loop).
+        Returns a final result (usually text to be inserted).
+        """
+        try:
+            history_block = "\n".join([f"- {h}" for h in history])
+            
+            prompt = f"""You are 'Typira Agent'. The user has triggered a specific action.
+USER HISTORY:
+{history_block}
+
+CURRENT CONTEXT: "{context}"
+ACTION TRIGGERED: {action_id}
+AI INSTRUCTION: "{payload}"
+
+TASK:
+Carry out the instruction precisely using the user's history for personalization. 
+If the task is to 'Draft' or 'Rewrite', return the full resulting text. 
+Return the result in a JSON format.
+
+OUTPUT FORMAT:
+{{
+  "thought": "Briefly explain what you did (e.g. 'Synthesized a formal draft based on your typical style').",
+  "result": "The actual text to be used/inserted."
+}}"""
+
+            response = GeminiBusiness.client.models.generate_content(
+                model=GeminiBusiness.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json'
+                )
+            )
+            import json
+            return json.loads(response.text)
+        except Exception as e:
+            print(f"Action Execution Error: {e}")
+            return {"thought": "Error executing action.", "result": ""}
 

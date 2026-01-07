@@ -11,6 +11,7 @@ class TypingHistoryManager {
     
     var onThoughtUpdate: ((String) -> Void)?
     var onActionsReceived: (([[String: Any]]) -> Void)?
+    var onResultReceived: ((String) -> Void)?
     
     // App Group for sharing JWT token with Flutter app
     private let appGroupSuiteName: String? = nil 
@@ -25,7 +26,7 @@ class TypingHistoryManager {
     
     private let manager = SocketManager(socketURL: URL(string: "http://localhost:7009")!, config: [.log(false), .compress])
     private var socket: SocketIOClient?
-
+ 
     init() {
         setupSocket()
     }
@@ -46,8 +47,14 @@ class TypingHistoryManager {
         socket?.on("suggestion_ready") { [weak self] data, ack in
             if let dict = data[0] as? [String: Any], let thought = dict["thought"] as? String {
                 let actions = dict["actions"] as? [[String: Any]] ?? []
+                let result = dict["result"] as? String ?? ""
+                
                 self?.onThoughtUpdate?("💡 \(thought)")
                 self?.onActionsReceived?(actions)
+                
+                if !result.isEmpty {
+                    self?.onResultReceived?(result)
+                }
             }
         }
         
@@ -137,5 +144,18 @@ class TypingHistoryManager {
         
         socket?.emit("analyze", payload)
         NSLog("DEBUG: [TypiraSocket] Emitting scrubbed 'full_context' for \(cleanFullText.count) chars")
+    }
+    
+    func performAction(id: String, type: String, payload: String?, context: String) {
+        let eventPayload: [String: Any] = [
+            "token": jwtToken ?? "",
+            "action_id": id,
+            "type": type,
+            "payload": payload ?? "",
+            "context": context
+        ]
+        
+        socket?.emit("perform_action", eventPayload)
+        NSLog("DEBUG: [TypiraSocket] Emitting 'perform_action': \(id)")
     }
 }

@@ -56,6 +56,7 @@ class KeyboardViewController: UIInputViewController {
     // Ingestion
     let historyManager = TypingHistoryManager()
     var lastSyncedContext: String = ""
+    var currentSmartActions: [[String: Any]] = []
     
     deinit {
         suggestionTimer?.invalidate()
@@ -85,10 +86,19 @@ class KeyboardViewController: UIInputViewController {
                 self?.renderActionChips(actions: actions)
             }
         }
+        historyManager.onResultReceived = { [weak self] result in
+            DispatchQueue.main.async {
+                self?.lastSuggestedCompletion = result
+                self?.suggestionLabel?.text = "\(result) (Tap to insert)"
+                self?.suggestionLabel?.textColor = .black
+                self?.suggestionLabel?.backgroundColor = UIColor(red: 0.95, green: 0.98, blue: 1.0, alpha: 1.0) // Soft highlight
+            }
+        }
     }
     
     func renderActionChips(actions: [[String: Any]]) {
         guard let stack = self.smartActionStack else { return }
+        self.currentSmartActions = actions // Cache for lookup
         
         // Clear children
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }

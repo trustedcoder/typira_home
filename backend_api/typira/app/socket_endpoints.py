@@ -126,7 +126,37 @@ def handle_analyze(data):
         
     # 4. Finalize and Show Actions
     emit('thought_update', {'text': analysis.get('final_thought', 'Ready.')})
+    print(analysis.get('actions', []))
     emit('suggestion_ready', {
         'thought': analysis.get('final_thought', ''),
         'actions': analysis.get('actions', [])
+    })
+    
+@socketio.on('perform_action')
+def handle_perform_action(data):
+    """
+    Handles iterative agentic loops (Step 2 of an action).
+    Expected data: {'action_id': '...', 'payload': '...', 'context': '...'}
+    """
+    from app.business.gemini_business import GeminiBusiness
+    action_id = data.get('action_id')
+    payload = data.get('payload')
+    context = data.get('context', '')
+    
+    emit('thought_update', {'text': f"Executing {action_id}..."})
+    
+    # Fetch History for personalization
+    frequent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.frequency.desc()).limit(30).all()
+    recent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.timestamp.desc()).limit(20).all()
+    combined_history = list(set([h.content for h in frequent_history] + [h.content for h in recent_history]))
+    
+    # Call the Agentic Brain for specialized execution
+    execution = GeminiBusiness.perform_agentic_action(action_id, payload, context, combined_history)
+    
+    # Return result
+    emit('thought_update', {'text': execution.get('thought', 'Task complete.')})
+    emit('suggestion_ready', {
+        'thought': execution.get('thought', ''),
+        'result': execution.get('result', ''),
+        'actions': [] # Usually clear actions after execution
     })

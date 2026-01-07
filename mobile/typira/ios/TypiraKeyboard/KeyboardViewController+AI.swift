@@ -69,9 +69,36 @@ extension KeyboardViewController {
     
     @objc func didTapActionChip(_ sender: UIButton) {
         let title = sender.title(for: .normal) ?? ""
-        let actionId = sender.accessibilityIdentifier
+        let actionId = sender.accessibilityIdentifier ?? ""
         
-        // Router for Action Strip buttons
+        // Lookup Smart Metadata
+        if let metadata = currentSmartActions.first(where: { ($0["id"] as? String) == actionId }) {
+            let type = metadata["type"] as? String ?? ""
+            let payload = metadata["payload"] as? String ?? ""
+            
+            NSLog("DEBUG: [Action] Tapped Smart Chip: \(actionId) Type: \(type)")
+            
+            if type == "deep_link" {
+                if let url = URL(string: payload) {
+                    // In Keyboard Extensions, we use extensionContext?.open
+                    self.extensionContext?.open(url, completionHandler: nil)
+                    self.suggestionLabel?.text = "Opening \(actionId)..."
+                }
+            } else if type == "prompt_trigger" {
+                // Iterative AI Loop
+                let before = textDocumentProxy.documentContextBeforeInput ?? ""
+                let after = textDocumentProxy.documentContextAfterInput ?? ""
+                let fullContext = before + after
+                
+                historyManager.performAction(id: actionId, type: type, payload: payload, context: fullContext)
+                
+                // Visual feedback: show specific action thought
+                self.suggestionLabel?.text = "Typira is working on: \(title)..."
+            }
+            return
+        }
+        
+        // Legacy/Fixed Action Strip Buttons
         if actionId == "rewrite" || title == "✨ Rewrite" {
             showView(.agent)
         } else if actionId == "paste" || title == "🧠 Paste" {
@@ -86,16 +113,10 @@ extension KeyboardViewController {
                 sender.tintColor = .cyan
                 UIView.animate(withDuration: 1.0) { sender.tintColor = originalColor }
             }
-        } else if actionId == "plan" || title == "📅 Plan" {
-            // Future Plan action
         } else if actionId == "mic" || title == "🎙️" {
             handleMicAction()
         } else if actionId == "hub" {
             showView(.agent)
-        } else {
-            // Smart AI Action
-            NSLog("Smart AI Action Triggered: \(actionId ?? "none") with title: \(title)")
-            // Future: Handoff to Week 2/3 logic
         }
     }
     

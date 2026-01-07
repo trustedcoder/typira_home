@@ -14,7 +14,8 @@ import java.net.URISyntaxException
 class TypingHistoryManager(
     private val context: Context, 
     private val onThoughtUpdate: (String) -> Unit,
-    private val onActionsReceived: (org.json.JSONArray) -> Unit
+    private val onActionsReceived: (org.json.JSONArray) -> Unit,
+    private val onResultReceived: (String) -> Unit
 ) {
 
     private var socket: Socket? = null
@@ -72,12 +73,16 @@ class TypingHistoryManager(
                     val data = args[0] as JSONObject
                     val thought = data.getString("thought")
                     val actions = data.optJSONArray("actions") ?: org.json.JSONArray()
+                    val result = data.optString("result", "")
                     
                     Log.d("TypiraSocket", "Received suggestion: $thought with ${actions.length()} actions")
                     
                     handler.post { 
                         onThoughtUpdate("💡 $thought")
                         onActionsReceived(actions)
+                        if (result.isNotEmpty()) {
+                            onResultReceived(result)
+                        }
                     }
                 } catch (e: Exception) {
                     Log.e("TypiraSocket", "Error parsing suggestion_ready: ${e.message}")
@@ -92,6 +97,18 @@ class TypingHistoryManager(
         } catch (e: URISyntaxException) {
             Log.e("TypiraSocket", "URL Error: ${e.message}")
         }
+    }
+
+    fun performAction(id: String, type: String, payload: String?, contextStr: String) {
+        val json = JSONObject()
+        json.put("token", jwtToken)
+        json.put("action_id", id)
+        json.put("type", type)
+        json.put("payload", payload ?: "")
+        json.put("context", contextStr)
+
+        socket?.emit("perform_action", json)
+        Log.d("TypiraSocket", "Emitting 'perform_action': $id")
     }
 
     fun onTextTyped(text: CharSequence, editorInfo: EditorInfo?) {

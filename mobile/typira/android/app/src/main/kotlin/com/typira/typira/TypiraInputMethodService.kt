@@ -14,6 +14,8 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.speech.tts.TextToSpeech
 import android.view.inputmethod.ExtractedTextRequest
+import org.json.JSONArray
+import org.json.JSONObject
 
 class TypiraInputMethodService : InputMethodService() {
 
@@ -54,6 +56,7 @@ class TypiraInputMethodService : InputMethodService() {
     private var tts: TextToSpeech? = null
     private var lastSuggestedCompletion: String = ""
     private var lastTypedLength: Int = 0
+    private var currentSmartActions = mutableListOf<org.json.JSONObject>()
 
     // Services
     private lateinit var aiService: AIService
@@ -66,19 +69,28 @@ class TypiraInputMethodService : InputMethodService() {
         aiService = AIService()
         audioService = AudioService()
         uiManager = KeyboardUIManager(this)
-        historyManager = TypingHistoryManager(this, { message ->
+        historyManager = TypingHistoryManager(this, { message: String ->
             android.util.Log.d("TypiraUI", "Updating Suggestion TextView: $message")
             if (this::tvSuggestion.isInitialized) {
                 tvSuggestion.text = message
-                if (message.startsWith("�")) {
+                tvSuggestion.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                if (message.contains("💡")) {
                     tvSuggestion.setTextColor(android.graphics.Color.parseColor("#1AA260")) // Google Green for suggestions
                 } else {
                     tvSuggestion.setTextColor(android.graphics.Color.parseColor("#1A73E8")) // Google Blue for thoughts
                 }
             }
-        }, { actions ->
+        }, { actions: JSONArray ->
             android.util.Log.d("TypiraUI", "Received ${actions.length()} actions for rendering")
             renderActionChips(actions)
+        }, { result: String ->
+            android.util.Log.d("TypiraUI", "Received AI Result: $result")
+            if (this::tvSuggestion.isInitialized) {
+                lastSuggestedCompletion = result
+                tvSuggestion.text = "$result (Tap to insert)"
+                tvSuggestion.setTextColor(android.graphics.Color.BLACK)
+                tvSuggestion.setBackgroundColor(android.graphics.Color.parseColor("#F1F8E9")) // Light highlight
+            }
         })
     }
 
@@ -99,10 +111,11 @@ class TypiraInputMethodService : InputMethodService() {
         return view
     }
 
-    private fun renderActionChips(actions: org.json.JSONArray) {
+    private fun renderActionChips(actions: JSONArray) {
         if (!this::smartActionContainer.isInitialized) return
         
         smartActionContainer.removeAllViews()
+        currentSmartActions.clear()
         
         if (actions.length() == 0) {
             smartActionContainer.addView(tvSmartStatus)
@@ -111,6 +124,8 @@ class TypiraInputMethodService : InputMethodService() {
         
         for (i in 0 until actions.length()) {
             val action = actions.getJSONObject(i)
+            currentSmartActions.add(action)
+            
             val label = action.getString("label")
             val actionId = action.getString("id")
             
@@ -282,9 +297,41 @@ class TypiraInputMethodService : InputMethodService() {
         emojiButton.text = if (state == KeyboardState.EMOJI) "ABC" else "☺"
     }
 
-    private fun onAgentActionClick(action: String) {
-        Toast.makeText(this, "Agent: $action", Toast.LENGTH_SHORT).show()
-        if (action == "Rewrite") {
+    private fun onAgentActionClick(actionId: String) {
+        // Smart Action Lookup
+        val smartAction = (0 until currentSmartActions.size).map { currentSmartActions[it] }
+            .find { it.getString("id") == actionId }
+            
+        if (smartAction != null) {
+            val type = smartAction.optString("type", "")
+            val payload = smartAction.optString("payload", "")
+            val label = smartAction.optString("label", actionId)
+            
+            android.util.Log.d("Typira", "Tapped Smart Action: $actionId Type: $type")
+            
+            if (type == "deep_link") {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(payload))
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    startActivity(intent)
+                    tvSuggestion.text = "Opening $label..."
+                } catch (e: Exception) {
+                    Toast.makeText(this, "Could not open: $label", Toast.LENGTH_SHORT).show()
+                }
+            } else if (type == "prompt_trigger") {
+                val inputConnection = currentInputConnection
+                val extractedText = inputConnection?.getExtractedText(ExtractedTextRequest(), 0)
+                val fullContext = extractedText?.text?.toString() ?: ""
+                
+                historyManager.performAction(actionId, type, payload, fullContext)
+                tvSuggestion.text = "Typira is working on: $label..."
+            }
+            return
+        }
+
+        // Legacy/Fixed Action Hub
+        Toast.makeText(this, "Agent: $actionId", Toast.LENGTH_SHORT).show()
+        if (actionId == "Rewrite") {
             val currentText = currentInputConnection?.getExtractedText(ExtractedTextRequest(), 0)?.text?.toString() ?: ""
             if (currentText.isNotEmpty()) {
                 requestNativeRewrite(currentText)
