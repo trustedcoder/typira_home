@@ -190,41 +190,123 @@ extension KeyboardViewController {
         qwertyRowsStack?.addArrangedSubview(row3)
         
         mainStack.addArrangedSubview(qwertyRowsStack!)
-        qwertyRowsStack?.heightAnchor.constraint(equalToConstant: 220).isActive = true
+        qwertyRowsStack?.heightAnchor.constraint(equalToConstant: 150).isActive = true
 
-        // EMOJI VIEW
-        emojiScrollView = UIScrollView()
-        emojiScrollView?.isHidden = true
-        emojiScrollView?.translatesAutoresizingMaskIntoConstraints = false
-        emojiScrollView?.backgroundColor = .clear 
+        // EMOJI VIEW CONTAINER
+        let emojiContainer = UIStackView()
+        emojiContainer.axis = .vertical
+        emojiContainer.spacing = 0
+        emojiContainer.translatesAutoresizingMaskIntoConstraints = false
+        emojiContainer.isHidden = true
+        emojiContainer.backgroundColor = UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1.0) // System Gray 6
+        self.emojiView = emojiContainer
         
-        let emojiStack = UIStackView()
-        emojiStack.axis = .vertical
-        emojiStack.spacing = 12
-        emojiStack.translatesAutoresizingMaskIntoConstraints = false
-        emojiScrollView?.addSubview(emojiStack)
+        // 1. Search Bar Area
+        let searchContainer = UIView()
+        searchContainer.translatesAutoresizingMaskIntoConstraints = false
+        searchContainer.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        searchContainer.backgroundColor = .clear
+        
+        let searchBar = UISearchBar()
+        searchBar.placeholder = "Search Emoji"
+        searchBar.backgroundImage = UIImage() // Remove lines
+        searchBar.searchBarStyle = .minimal
+        searchBar.translatesAutoresizingMaskIntoConstraints = false
+        searchContainer.addSubview(searchBar)
         
         NSLayoutConstraint.activate([
-            emojiStack.topAnchor.constraint(equalTo: emojiScrollView!.topAnchor, constant: 8),
-            emojiStack.leadingAnchor.constraint(equalTo: emojiScrollView!.leadingAnchor, constant: 4),
-            emojiStack.trailingAnchor.constraint(equalTo: emojiScrollView!.trailingAnchor, constant: -4),
-            emojiStack.bottomAnchor.constraint(equalTo: emojiScrollView!.bottomAnchor, constant: -8),
-            emojiStack.widthAnchor.constraint(equalTo: emojiScrollView!.widthAnchor, constant: -8),
-            emojiScrollView!.heightAnchor.constraint(equalToConstant: 220)
+            searchBar.topAnchor.constraint(equalTo: searchContainer.topAnchor),
+            searchBar.leadingAnchor.constraint(equalTo: searchContainer.leadingAnchor, constant: 4),
+            searchBar.trailingAnchor.constraint(equalTo: searchContainer.trailingAnchor, constant: -4),
+            searchBar.bottomAnchor.constraint(equalTo: searchContainer.bottomAnchor)
         ])
+        emojiContainer.addArrangedSubview(searchContainer)
         
-        populateEmojis(in: emojiStack)
-        mainStack.addArrangedSubview(emojiScrollView!)
+        // 2. Emoji Grid (UICollectionView)
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumInteritemSpacing = 2
+        layout.minimumLineSpacing = 2
+        layout.sectionHeadersPinToVisibleBounds = true // Native Sticky Headers
+        
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.translatesAutoresizingMaskIntoConstraints = false
+        cv.backgroundColor = UIColor(red: 209/255, green: 213/255, blue: 219/255, alpha: 1.0) // Native Keyboard Light Gray
+        cv.showsHorizontalScrollIndicator = false
+        cv.showsVerticalScrollIndicator = false
+        
+        cv.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "EmojiCell")
+        cv.register(UICollectionReusableView.self, forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader, withReuseIdentifier: "EmojiHeader")
+        
+        cv.dataSource = self
+        cv.delegate = self
+        self.emojiCollectionView = cv
+        
+        emojiContainer.addArrangedSubview(cv)
+        
+        // Remove old populateEmojis call since CollectionView handles it
+        // populateEmojis(in: emojiContentStack)
+        
+        // 3. Bottom Tab Bar
+        let tabBar = UIStackView()
+        tabBar.axis = .horizontal
+        tabBar.distribution = .fillEqually
+        tabBar.spacing = 0
+        tabBar.backgroundColor = UIColor(white: 1.0, alpha: 0.8)
+        tabBar.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        
+        // ABC Button (Back)
+        let abcBtn = UIButton(type: .system)
+        abcBtn.setTitle("ABC", for: .normal)
+        abcBtn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .bold)
+        abcBtn.setTitleColor(.black, for: .normal)
+        abcBtn.addTarget(self, action: #selector(toggleEmojiView), for: .touchUpInside)
+        tabBar.addArrangedSubview(abcBtn)
+        
+        // Categories (Mock Icons)
+        let icons = ["clock", "face.smiling", "hare", "fork.knife", "lightbulb"]
+        for icon in icons {
+            let btn = UIButton(type: .system)
+            if #available(iOS 13.0, *) {
+                btn.setImage(UIImage(systemName: icon), for: .normal)
+            } else {
+                btn.setTitle("•", for: .normal)
+            }
+            btn.tintColor = .systemGray
+            tabBar.addArrangedSubview(btn)
+        }
+        
+        // Delete Button
+        let delBtn = UIButton(type: .system)
+        if #available(iOS 13.0, *) {
+            delBtn.setImage(UIImage(systemName: "delete.left"), for: .normal)
+        } else {
+            delBtn.setTitle("⌫", for: .normal)
+        }
+        delBtn.tintColor = .black
+        delBtn.addTarget(self, action: #selector(didTapKey(_:)), for: .touchUpInside)
+        // Hack: Map delete button to existing key handler logic if it expects title "⌫"
+        // We'll handle this by ensuring didTapKey handles the image or we set accessibilityIdentifier
+        
+        tabBar.addArrangedSubview(delBtn)
+        
+        emojiContainer.addArrangedSubview(tabBar)
+        
+        mainStack.addArrangedSubview(emojiContainer)
+        
+        // Constraint to ensure grid takes remaining space
+        emojiContainer.heightAnchor.constraint(equalToConstant: 260).isActive = true
         
         // BOTTOM ROW
-        let row4 = UIStackView()
-        row4.axis = .horizontal
-        row4.spacing = 6
-        row4.distribution = .fillProportionally
+        let bottomRow = UIStackView()
+        self.bottomKeyRow = bottomRow
+        bottomRow.axis = .horizontal
+        bottomRow.spacing = 6
+        bottomRow.distribution = .fillProportionally
         
         self.modeButton = createButton(title: "123", isSpecial: true)
         self.modeButton?.tag = 102
-        self.emojiButton = createButton(title: "☺", isSpecial: true)
+        self.emojiButton = createButton(title: "😀", isSpecial: true, isSymbol: true)
         self.emojiButton?.tag = 103
         let spaceBtn = createButton(title: "space", isSpecial: false)
         
@@ -233,46 +315,90 @@ extension KeyboardViewController {
         
         let returnBtn = createButton(title: "return", isSpecial: true)
         
-        row4.addArrangedSubview(modeButton!)
-        row4.addArrangedSubview(emojiButton!)
-        row4.addArrangedSubview(spaceBtn)
-        row4.addArrangedSubview(returnBtn)
+        bottomRow.addArrangedSubview(modeButton!)
+        bottomRow.addArrangedSubview(emojiButton!)
+        bottomRow.addArrangedSubview(spaceBtn)
+        bottomRow.addArrangedSubview(returnBtn)
         
         NSLayoutConstraint.activate([
             modeButton!.widthAnchor.constraint(equalTo: emojiButton!.widthAnchor),
             spaceBtn.widthAnchor.constraint(greaterThanOrEqualTo: emojiButton!.widthAnchor, multiplier: 4),
             returnBtn.widthAnchor.constraint(equalTo: emojiButton!.widthAnchor, multiplier: 1.5),
-            row4.heightAnchor.constraint(equalToConstant: 50)
+            bottomRow.heightAnchor.constraint(equalToConstant: 45)
         ])
-        mainStack.addArrangedSubview(row4)
+        mainStack.addArrangedSubview(bottomRow)
         
         showView(.main)
         updateShiftUI()
         self.view.layoutIfNeeded()
     }
 
-    func createButton(title: String, isSpecial: Bool = false) -> UIButton {
+    func createButton(title: String, isSpecial: Bool = false, isSymbol: Bool = false) -> UIButton {
         let button = UIButton(type: .system)
-        button.setTitle(title, for: .normal)
-        button.layer.cornerRadius = 5
+        
+        if isSymbol {
+            // Try explicit image, then Base64 fallback (Guaranteed)
+            // Try explicit image (Assets or Bundle Resource)
+            // Use same pattern as ic_ai_custom (simple named lookup + alwaysOriginal)
+            if let image = UIImage(named: "ic_native_emoji") ?? UIImage(named: "ic_native_emoji.png") {
+                button.setImage(image.withRenderingMode(.alwaysOriginal), for: .normal)
+                button.imageView?.contentMode = .scaleAspectFit
+                button.setTitle("", for: .normal)
+
+            } else if #available(iOS 13.0, *), let image = UIImage(systemName: title, withConfiguration: UIImage.SymbolConfiguration(pointSize: 21, weight: .medium)) {
+                // SF Symbol Found
+                button.setImage(image, for: .normal)
+                button.tintColor = .black
+                button.setTitle("", for: .normal)
+            } else {
+                // Fallback: Use Title (Emoji)
+                button.setImage(nil, for: .normal)
+                // Use Text Variation Selector (\u{FE0E}) to force monochrome (black & white)
+                let icon = title.isEmpty ? "😀\u{FE0E}" : (title == "😀" ? "😀\u{FE0E}" : title)
+                button.setTitle(icon, for: .normal)
+                button.titleLabel?.font = UIFont.systemFont(ofSize: 26)
+                button.titleLabel?.adjustsFontSizeToFitWidth = true
+                button.titleLabel?.minimumScaleFactor = 0.5
+            }
+        } else {
+            button.setTitle(title, for: .normal)
+            button.setImage(nil, for: .normal)
+        }
+        
+        button.layer.cornerRadius = 6
+        
+        // Native iOS Colors
+        let specialKeyColor = UIColor(red: 172/255, green: 179/255, blue: 188/255, alpha: 1.0)
+        let charKeyColor = UIColor.white
         
         if isSpecial {
-             button.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
-             button.backgroundColor = UIColor(white: 0.65, alpha: 1.0)
+            if !isSymbol {
+                button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .regular)
+            }
+            button.backgroundColor = specialKeyColor
+            
+            if title == "⌫" || title == "⇧" {
+                button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .regular)
+            }
         } else {
-             button.titleLabel?.font = UIFont.systemFont(ofSize: 25, weight: .regular)
-             button.backgroundColor = .white
-             
+            if title == "space" {
+                button.setTitle("space", for: .normal)
+                button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .regular)
+            } else {
+                button.titleLabel?.font = UIFont.systemFont(ofSize: 26, weight: .light)
+            }
+            button.backgroundColor = charKeyColor
+            
             if !isSpecial && title.count == 1 {
-                 letterButtons.append(button)
-             }
+                letterButtons.append(button)
+            }
         }
         
         button.setTitleColor(.black, for: .normal)
         button.layer.shadowColor = UIColor.black.cgColor
         button.layer.shadowOffset = CGSize(width: 0, height: 1)
         button.layer.shadowRadius = 0
-        button.layer.shadowOpacity = 0.35
+        button.layer.shadowOpacity = 0.3
         
         button.addTarget(self, action: #selector(didTapKey(_:)), for: .touchUpInside)
         return button
@@ -297,9 +423,10 @@ extension KeyboardViewController {
         let btn = UIButton(type: .system)
         
         if actionId == "hub" {
-            let image = UIImage(named: "ic_ai_custom")?.withRenderingMode(.alwaysOriginal)
-            btn.setImage(image, for: .normal)
-            btn.imageView?.contentMode = .scaleAspectFit
+            if let image = UIImage(named: "ic_ai_custom") {
+                btn.setImage(image.withRenderingMode(.alwaysOriginal), for: .normal)
+                btn.imageView?.contentMode = .scaleAspectFit
+            }
             btn.contentHorizontalAlignment = .fill
             btn.contentVerticalAlignment = .fill
             
@@ -450,45 +577,5 @@ extension KeyboardViewController {
         }
     }
 
-    func populateEmojis(in stack: UIStackView) {
-        let emojiGroups: [[String]] = [
-            ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣", "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗"],
-            ["🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯", "😦", "😧", "😮", "😲", "🥱", "😴", "🤤", "😪", "😵", "🤐", "🥴", "🤢", "🤮", "🤧", "🥵", "🥶", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿", "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖", "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾"]
-        ]
-        
-        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        
-        for group in emojiGroups {
-            var row = UIStackView()
-            row.axis = .horizontal
-            row.distribution = .fillEqually
-            row.spacing = 4
-            
-            for (index, emoji) in group.enumerated() {
-                let btn = UIButton(type: .system)
-                btn.setTitle(emoji, for: .normal)
-                btn.titleLabel?.font = UIFont.systemFont(ofSize: 32)
-                btn.addTarget(self, action: #selector(didTapKey(_:)), for: .touchUpInside)
-                row.addArrangedSubview(btn)
-                
-                if (index + 1) % 8 == 0 {
-                    stack.addArrangedSubview(row)
-                    row = UIStackView()
-                    row.axis = .horizontal
-                    row.distribution = .fillEqually
-                    row.spacing = 4
-                }
-            }
-            if !row.arrangedSubviews.isEmpty {
-                while row.arrangedSubviews.count < 8 {
-                    row.addArrangedSubview(UIView())
-                }
-                stack.addArrangedSubview(row)
-            }
-            
-            let spacer = UIView()
-            spacer.heightAnchor.constraint(equalToConstant: 20).isActive = true
-            stack.addArrangedSubview(spacer)
-        }
-    }
+
 }
