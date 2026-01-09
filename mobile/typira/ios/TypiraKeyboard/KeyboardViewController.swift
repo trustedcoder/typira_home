@@ -13,6 +13,11 @@ class KeyboardViewController: UIInputViewController {
     enum ShiftState { case off, on, locked }
     enum ActiveView { case main, agent, voice }
 
+    // Standard Keyboard Colors
+    static let standardSpecialKeyColor = UIColor(red: 172/255, green: 179/255, blue: 188/255, alpha: 1.0)
+    static let standardCharKeyColor = UIColor.white
+    static let keyboardBackgroundColor = UIColor(red: 209/255, green: 212/255, blue: 217/255, alpha: 1.0)
+
     @IBOutlet var nextKeyboardButton: UIButton!
     
     // State
@@ -28,13 +33,13 @@ class KeyboardViewController: UIInputViewController {
     var recordingURL: URL?
     
     var lastShiftPressTime: Double = 0
-    let doubleTapTimeout: Double = 0.3
+    let doubleTapTimeout: Double = 0.5
     
     // UI Elements (Exposed to Extensions)
     var letterButtons = [UIButton]()
-    let qwertyChars = "qwertyuiopasdfghjklzxcvbnm"
-    let symbolChars = "1234567890-/:;()$&@\".,?!'  " 
-    let extraSymbolChars = "[]{}#%^*+=_\\|~<>€£¥•.,?!'  "
+    let qwertyChars = "qwertyuiopasdfghjkl zxcvbnm" // Index 19 is a dummy space
+    let symbolChars = "1234567890-/:;()$&@“.,?!‘  " // Row 2: 10 chars, Row 3: 5 chars + 2 spaces
+    let extraSymbolChars = "[]{}#%^*+=_\\|~<>€£¥•.,?!‘  "
     
     var qwertyRowsStack: UIStackView?
     var bottomKeyRow: UIStackView?

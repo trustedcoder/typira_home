@@ -2,11 +2,56 @@ import UIKit
 import Foundation
 
 extension KeyboardViewController {
+
+class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
+    
+    override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
+        guard let attributes = super.layoutAttributesForElements(in: rect) else { return nil }
+        let copy = attributes.map { $0.copy() as! UICollectionViewLayoutAttributes }
+        
+        for attribute in copy {
+            if attribute.representedElementCategory == .supplementaryView,
+               attribute.representedElementKind == UICollectionView.elementKindSectionHeader {
+                adjustHeaderAttributes(attribute)
+            }
+        }
+        return copy
+    }
+    
+    override func layoutAttributesForSupplementaryView(ofKind elementKind: String, at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+        guard let attribute = super.layoutAttributesForSupplementaryView(ofKind: elementKind, at: indexPath)?.copy() as? UICollectionViewLayoutAttributes else { return nil }
+        adjustHeaderAttributes(attribute)
+        return attribute
+    }
+    
+    private func adjustHeaderAttributes(_ attributes: UICollectionViewLayoutAttributes) {
+        guard let collectionView = self.collectionView,
+              let dataSource = collectionView.dataSource as? KeyboardViewController else { return }
+        
+        let section = attributes.indexPath.section
+        let title = dataSource.emojiSections[section].title
+        let font = UIFont.systemFont(ofSize: 10, weight: .bold)
+        let visualWidth = title.size(withAttributes: [.font: font]).width + 20 
+        
+        if let lastItemAttrs = self.layoutAttributesForItem(at: IndexPath(item: dataSource.emojiSections[section].emojis.count - 1, section: section)) {
+            let sectionMaxX = lastItemAttrs.frame.maxX + self.sectionInset.right
+            let limitX = sectionMaxX - visualWidth
+            
+            if attributes.frame.origin.x > limitX {
+                attributes.frame.origin.x = limitX
+            }
+        }
+    }
+    
+    override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+        return true
+    }
+}
     
     func setupKeyboardLayout() {
         letterButtons.removeAll()
         self.view.subviews.forEach { $0.removeFromSuperview() }
-        self.view.backgroundColor = UIColor(red: 209/255, green: 212/255, blue: 217/255, alpha: 1.0)
+        self.view.backgroundColor = KeyboardViewController.keyboardBackgroundColor
         
         let toolbarStack = UIStackView()
         toolbarStack.axis = .vertical
@@ -165,28 +210,28 @@ extension KeyboardViewController {
         qwertyRowsStack?.spacing = 10
         
         qwertyRowsStack?.addArrangedSubview(createRow(keys: ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]))
-        qwertyRowsStack?.addArrangedSubview(createRow(keys: ["a", "s", "d", "f", "g", "h", "j", "k", "l"], sidePadding: 20))
+        
+        // Row 2: Always 10 slots. Manager visibility & padding in updateKeys
+        let row2 = createRow(keys: ["a", "s", "d", "f", "g", "h", "j", "k", "l", " "])
+        qwertyRowsStack?.addArrangedSubview(row2)
         
         let row3 = UIStackView()
         row3.axis = .horizontal
         row3.spacing = 6
-        row3.distribution = .fillProportionally
+        row3.distribution = .fillEqually
         
         self.shiftButton = createButton(title: "⇧", isSpecial: true)
         self.shiftButton?.tag = 101
+        
         let backBtn = createButton(title: "⌫", isSpecial: true)
         
         row3.addArrangedSubview(shiftButton!)
-        var bottomRowKeys = ["z", "x", "c", "v", "b", "n", "m"]
+        let bottomRowKeys = ["z", "x", "c", "v", "b", "n", "m"]
         for key in bottomRowKeys {
             row3.addArrangedSubview(createButton(title: key))
         }
         row3.addArrangedSubview(backBtn)
-        
-        NSLayoutConstraint.activate([
-            shiftButton!.widthAnchor.constraint(equalTo: backBtn.widthAnchor),
-            shiftButton!.widthAnchor.constraint(equalToConstant: 42)
-        ])
+
         qwertyRowsStack?.addArrangedSubview(row3)
         
         mainStack.addArrangedSubview(qwertyRowsStack!)
@@ -198,40 +243,21 @@ extension KeyboardViewController {
         emojiContainer.spacing = 0
         emojiContainer.translatesAutoresizingMaskIntoConstraints = false
         emojiContainer.isHidden = true
-        emojiContainer.backgroundColor = UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1.0) // System Gray 6
+        emojiContainer.backgroundColor = KeyboardViewController.keyboardBackgroundColor // Native Keyboard Gray
         self.emojiView = emojiContainer
         
-        // 1. Search Bar Area
-        let searchContainer = UIView()
-        searchContainer.translatesAutoresizingMaskIntoConstraints = false
-        searchContainer.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        searchContainer.backgroundColor = .clear
-        
-        let searchBar = UISearchBar()
-        searchBar.placeholder = "Search Emoji"
-        searchBar.backgroundImage = UIImage() // Remove lines
-        searchBar.searchBarStyle = .minimal
-        searchBar.translatesAutoresizingMaskIntoConstraints = false
-        searchContainer.addSubview(searchBar)
-        
-        NSLayoutConstraint.activate([
-            searchBar.topAnchor.constraint(equalTo: searchContainer.topAnchor),
-            searchBar.leadingAnchor.constraint(equalTo: searchContainer.leadingAnchor, constant: 4),
-            searchBar.trailingAnchor.constraint(equalTo: searchContainer.trailingAnchor, constant: -4),
-            searchBar.bottomAnchor.constraint(equalTo: searchContainer.bottomAnchor)
-        ])
-        emojiContainer.addArrangedSubview(searchContainer)
+
         
         // 2. Emoji Grid (UICollectionView)
-        let layout = UICollectionViewFlowLayout()
+        let layout = StickyOverlayFlowLayout()
         layout.scrollDirection = .horizontal
         layout.minimumInteritemSpacing = 2
-        layout.minimumLineSpacing = 2
+        layout.minimumLineSpacing = 12 // 5pt between columns
         layout.sectionHeadersPinToVisibleBounds = true // Native Sticky Headers
         
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
         cv.translatesAutoresizingMaskIntoConstraints = false
-        cv.backgroundColor = UIColor(red: 209/255, green: 213/255, blue: 219/255, alpha: 1.0) // Native Keyboard Light Gray
+        cv.backgroundColor = .clear // Transparent to show container gray
         cv.showsHorizontalScrollIndicator = false
         cv.showsVerticalScrollIndicator = false
         
@@ -252,27 +278,35 @@ extension KeyboardViewController {
         tabBar.axis = .horizontal
         tabBar.distribution = .fillEqually
         tabBar.spacing = 0
-        tabBar.backgroundColor = UIColor(white: 1.0, alpha: 0.8)
+        tabBar.backgroundColor = .clear // Remove white background
         tabBar.heightAnchor.constraint(equalToConstant: 40).isActive = true
         
         // ABC Button (Back)
         let abcBtn = UIButton(type: .system)
         abcBtn.setTitle("ABC", for: .normal)
-        abcBtn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .bold)
+        abcBtn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .regular) // Native iOS style
         abcBtn.setTitleColor(.black, for: .normal)
         abcBtn.addTarget(self, action: #selector(toggleEmojiView), for: .touchUpInside)
         tabBar.addArrangedSubview(abcBtn)
         
-        // Categories (Mock Icons)
-        let icons = ["clock", "face.smiling", "hare", "fork.knife", "lightbulb"]
-        for icon in icons {
+        // Categories (Functional Icons)
+        let categoryIcons = ["clock", "face.smiling", "hare", "fork.knife", "sportscourt", "car", "lightbulb", "number.circle", "flag"]
+        
+        for (index, _) in self.emojiSections.enumerated() {
+            let iconName = index < categoryIcons.count ? categoryIcons[index] : "circle"
             let btn = UIButton(type: .system)
+            btn.tag = index
             if #available(iOS 13.0, *) {
-                btn.setImage(UIImage(systemName: icon), for: .normal)
+                btn.setImage(UIImage(systemName: iconName), for: .normal)
             } else {
                 btn.setTitle("•", for: .normal)
             }
             btn.tintColor = .systemGray
+            btn.contentEdgeInsets = UIEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
+            btn.imageView?.contentMode = .scaleAspectFit
+            btn.contentHorizontalAlignment = .center
+            btn.contentVerticalAlignment = .center
+            btn.addTarget(self, action: #selector(didTapCategoryIcon(_:)), for: .touchUpInside)
             tabBar.addArrangedSubview(btn)
         }
         
@@ -284,6 +318,11 @@ extension KeyboardViewController {
             delBtn.setTitle("⌫", for: .normal)
         }
         delBtn.tintColor = .black
+        delBtn.tag = 105 // Special tag for Emoji View Delete
+        delBtn.contentEdgeInsets = UIEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
+        delBtn.imageView?.contentMode = .scaleAspectFit
+        delBtn.contentHorizontalAlignment = .center
+        delBtn.contentVerticalAlignment = .center
         delBtn.addTarget(self, action: #selector(didTapKey(_:)), for: .touchUpInside)
         // Hack: Map delete button to existing key handler logic if it expects title "⌫"
         // We'll handle this by ensuring didTapKey handles the image or we set accessibilityIdentifier
@@ -368,8 +407,8 @@ extension KeyboardViewController {
         button.layer.cornerRadius = 6
         
         // Native iOS Colors
-        let specialKeyColor = UIColor(red: 172/255, green: 179/255, blue: 188/255, alpha: 1.0)
-        let charKeyColor = UIColor.white
+        let specialKeyColor = KeyboardViewController.standardSpecialKeyColor
+        let charKeyColor = KeyboardViewController.standardCharKeyColor
         
         if isSpecial {
             if !isSymbol {
@@ -385,7 +424,7 @@ extension KeyboardViewController {
                 button.setTitle("space", for: .normal)
                 button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .regular)
             } else {
-                button.titleLabel?.font = UIFont.systemFont(ofSize: 26, weight: .light)
+                button.titleLabel?.font = UIFont.systemFont(ofSize: 26, weight: .regular)
             }
             button.backgroundColor = charKeyColor
             

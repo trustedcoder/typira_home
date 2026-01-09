@@ -109,4 +109,12 @@ extension KeyboardViewController: UICollectionViewDataSource, UICollectionViewDe
         // Simple animation feedback
         // Audio feedback provided by system usually
     }
+
+    @objc func didTapCategoryIcon(_ sender: UIButton) {
+        let section = sender.tag
+        if section >= 0 && section < emojiSections.count {
+            let indexPath = IndexPath(item: 0, section: section)
+            self.emojiCollectionView?.scrollToItem(at: indexPath, at: .left, animated: true)
+        }
+    }
 }

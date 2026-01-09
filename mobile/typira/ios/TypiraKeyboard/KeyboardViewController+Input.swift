@@ -21,6 +21,12 @@ extension KeyboardViewController {
             return
         }
         
+        if sender.tag == 105 { // Emoji Delete
+            proxy.deleteBackward()
+            isLastKeyWordBoundary = false
+            return
+        }
+        
         switch title {
         case "space":
              historyManager.onTextTyped(" ", proxy: proxy)
@@ -122,6 +128,8 @@ extension KeyboardViewController {
         if isSymbols {
             modeButton?.setTitle("ABC", for: .normal)
             shiftButton?.setTitle("#+=", for: .normal)
+            shiftButton?.setImage(nil, for: .normal)
+            shiftButton?.backgroundColor = KeyboardViewController.standardSpecialKeyColor
         } else {
             modeButton?.setTitle("123", for: .normal)
             updateShiftUI()
@@ -133,31 +141,25 @@ extension KeyboardViewController {
         if isEmojiView { toggleEmojiView() }
         if isSymbols {
              isMoreSymbols = !isMoreSymbols
-             if isMoreSymbols {
-                  shiftButton?.setTitle("123", for: .normal)
-             } else {
-                  shiftButton?.setTitle("#+=", for: .normal)
-             }
+             shiftButton?.setTitle(isMoreSymbols ? "123" : "#+=", for: .normal)
+             shiftButton?.setImage(nil, for: .normal)
              updateKeys()
              return
         }
     
         let now = Date().timeIntervalSince1970
-        if shiftState == .off {
-            if now - lastShiftPressTime < doubleTapTimeout {
-                shiftState = .locked
-            } else {
-                shiftState = .on
-            }
-        } else if shiftState == .on {
-            if now - lastShiftPressTime < doubleTapTimeout {
-                shiftState = .locked
-            } else {
-                shiftState = .off
-            }
-        } else {
+        let isDoubleTap = (now - lastShiftPressTime < doubleTapTimeout)
+
+        if isDoubleTap && shiftState == .on {
+            shiftState = .locked
+        } else if shiftState == .locked {
             shiftState = .off
+        } else if shiftState == .on {
+            shiftState = .off
+        } else {
+            shiftState = .on
         }
+        
         lastShiftPressTime = now
         updateShiftUI()
     }
@@ -176,19 +178,38 @@ extension KeyboardViewController {
     func updateShiftUI() {
         if isSymbols { return }
         
+        guard let btn = shiftButton else { return }
+        
+        let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
+        
         switch shiftState {
         case .off:
-            shiftButton?.setTitle("⇧", for: .normal)
-            shiftButton?.backgroundColor = UIColor(white: 0.65, alpha: 1.0)
-            shiftButton?.setTitleColor(.black, for: .normal)
+            if #available(iOS 13.0, *) {
+                btn.setImage(UIImage(systemName: "shift", withConfiguration: config), for: .normal)
+                btn.setTitle("", for: .normal)
+            } else {
+                btn.setTitle("⇧", for: .normal)
+            }
+            btn.backgroundColor = KeyboardViewController.standardSpecialKeyColor
+            btn.tintColor = .black
         case .on:
-            shiftButton?.setTitle("⇧", for: .normal)
-            shiftButton?.backgroundColor = .white
-            shiftButton?.setTitleColor(.black, for: .normal)
+            if #available(iOS 13.0, *) {
+                btn.setImage(UIImage(systemName: "shift.fill", withConfiguration: config), for: .normal)
+                btn.setTitle("", for: .normal)
+            } else {
+                btn.setTitle("⇧", for: .normal)
+            }
+            btn.backgroundColor = KeyboardViewController.standardCharKeyColor
+            btn.tintColor = .black
         case .locked:
-             shiftButton?.setTitle("⇪", for: .normal)
-             shiftButton?.backgroundColor = .white
-             shiftButton?.setTitleColor(.black, for: .normal)
+            if #available(iOS 13.0, *) {
+                btn.setImage(UIImage(systemName: "capslock.fill", withConfiguration: config), for: .normal)
+                btn.setTitle("", for: .normal)
+            } else {
+                btn.setTitle("⇪", for: .normal)
+            }
+            btn.backgroundColor = KeyboardViewController.standardCharKeyColor
+            btn.tintColor = .black
         }
         updateKeys() // Ensure keys are updated with case
     }
@@ -196,18 +217,26 @@ extension KeyboardViewController {
     func updateKeys() {
         let qwertyArray = Array(qwertyChars)
         let symbolArray = Array(symbolChars)
-        var extraString = extraSymbolChars
-        while extraString.count < 26 { extraString += " " }
-        let extraArray = Array(extraString)
+        let extraArray = Array(extraSymbolChars)
         
+        let rows = qwertyRowsStack?.arrangedSubviews as? [UIStackView] ?? []
+        let row2 = rows.count > 1 ? rows[1] : nil
+
         for (index, btn) in letterButtons.enumerated() {
             if isSymbols {
-                if isMoreSymbols {
-                     let char = index < extraArray.count ? extraArray[index] : " "
-                     btn.setTitle(String(char), for: .normal)
-                } else {
-                     let char = index < symbolArray.count ? symbolArray[index] : " "
-                     btn.setTitle(String(char), for: .normal)
+                let char = isMoreSymbols ? (index < extraArray.count ? extraArray[index] : " ") : (index < symbolArray.count ? symbolArray[index] : " ")
+                btn.setTitle(String(char), for: .normal)
+                
+                // --- Row 2 (index 10-19) ---
+                if index == 19 {
+                    btn.isHidden = false
+                    row2?.layoutMargins = .zero
+                    row2?.isLayoutMarginsRelativeArrangement = false
+                }
+
+                // --- Row 3 (index 20-26) ---
+                if index >= 20 && index <= 26 {
+                    btn.isHidden = (index > 24)
                 }
             } else {
                 let char = index < qwertyArray.count ? qwertyArray[index] : " "
@@ -215,6 +244,18 @@ extension KeyboardViewController {
                     btn.setTitle(String(char).uppercased(), for: .normal)
                 } else {
                     btn.setTitle(String(char), for: .normal)
+                }
+
+                // --- Row 2 (index 10-19) ---
+                if index == 19 {
+                    btn.isHidden = true
+                    row2?.layoutMargins = UIEdgeInsets(top: 0, left: 20, bottom: 0, right: 20)
+                    row2?.isLayoutMarginsRelativeArrangement = true
+                }
+
+                // --- Row 3 (index 20-26) ---
+                if index >= 20 && index <= 26 {
+                    btn.isHidden = false
                 }
             }
         }
