@@ -11,7 +11,7 @@ import AVFoundation
 class KeyboardViewController: UIInputViewController {
 
     enum ShiftState { case off, on, locked }
-    enum ActiveView { case main, agent, voice }
+    enum ActiveView { case main, voice }
 
     // Standard Keyboard Colors
     static let standardSpecialKeyColor = UIColor(red: 172/255, green: 179/255, blue: 188/255, alpha: 1.0)
@@ -43,7 +43,6 @@ class KeyboardViewController: UIInputViewController {
     
     var qwertyRowsStack: UIStackView?
     var bottomKeyRow: UIStackView?
-    var agentHubView: UIView?
     var emojiView: UIView?
     var emojiCollectionView: UICollectionView?
     var emojiButton: UIButton?
@@ -158,7 +157,6 @@ class KeyboardViewController: UIInputViewController {
         
         qwertyRowsStack?.isHidden = (viewType != .main)
         emojiView?.isHidden = true 
-        agentHubView?.isHidden = (viewType != .agent)
         
         if viewType == .main {
             updateEmojiButtonTitle(isEmoji: false)

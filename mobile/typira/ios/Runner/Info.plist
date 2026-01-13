@@ -43,7 +43,20 @@
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.typira.typira</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>typira</string>
+			</array>
+		</dict>
+	</array>
+    <key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>NSBonjourServices</key>
 	<array>

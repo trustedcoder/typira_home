@@ -4,6 +4,7 @@ import Foundation
 extension KeyboardViewController {
     
     func fetchAISuggestion(for currentText: String) {
+        NSLog("DEBUG: [AI] Requesting suggestion for: \(currentText)")
         DispatchQueue.main.async {
             self.suggestionLabel?.alpha = 0.5
         }
@@ -70,6 +71,7 @@ extension KeyboardViewController {
     @objc func didTapActionChip(_ sender: UIButton) {
         let title = sender.title(for: .normal) ?? ""
         let actionId = sender.accessibilityIdentifier ?? ""
+        NSLog("DEBUG: [Action] Tapped Action Chip: id=\(actionId) tag=\(sender.tag) title=\(title)")
         
         // Lookup Smart Metadata
         if let metadata = currentSmartActions.first(where: { ($0["id"] as? String) == actionId }) {
@@ -80,8 +82,7 @@ extension KeyboardViewController {
             
             if type == "deep_link" {
                 if let url = URL(string: payload) {
-                    // In Keyboard Extensions, we use extensionContext?.open
-                    self.extensionContext?.open(url, completionHandler: nil)
+                    openApp(url: url)
                     self.suggestionLabel?.text = "Opening \(actionId)..."
                 }
             } else if type == "prompt_trigger" {
@@ -100,7 +101,9 @@ extension KeyboardViewController {
         
         // Legacy/Fixed Action Strip Buttons
         if actionId == "rewrite" || title == "✨ Rewrite" {
-            showView(.agent)
+            if let url = URL(string: "typira://app") {
+                openApp(url: url)
+            }
         } else if actionId == "paste" || title == "🧠 Paste" {
             handleRememberAction()
             // Visual feedback
@@ -116,8 +119,29 @@ extension KeyboardViewController {
         } else if actionId == "mic" || title == "🎙️" {
             handleMicAction()
         } else if actionId == "hub" {
-            showView(.agent)
+            if let url = URL(string: "typira://app") {
+                openApp(url: url)
+            }
         }
+    }
+    
+    private func openApp(url: URL) {
+        NSLog("DEBUG: [Action] Attempting to open URL: \(url.absoluteString)")
+        
+        var responder: UIResponder? = self as UIResponder
+        let selector = NSSelectorFromString("openURL:")
+        while responder != nil {
+            if responder!.responds(to: selector) && responder != self {
+                responder!.perform(selector, with: url)
+                NSLog("DEBUG: [Action] Found responder for openURL:")
+                return
+            }
+            responder = responder?.next
+        }
+        
+        // Final fallback to extensionContext
+        NSLog("DEBUG: [Action] Fallback to extensionContext.open")
+        self.extensionContext?.open(url, completionHandler: nil)
     }
     
     @objc func didTapSuggestionLabel(_ gesture: UITapGestureRecognizer) {

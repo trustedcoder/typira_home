@@ -206,11 +206,32 @@
                 android:paddingHorizontal="3dp"
                 android:weightSum="10"> 
 
-                <Button 
-                    android:id="@+id/key_shift" 
-                    style="@style/KeyboardKeySpecial" 
-                    android:text=""
-                    android:layout_weight="1.5" />
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1.5">
+                    
+                    <ImageButton 
+                        android:id="@+id/key_shift_icon" 
+                        style="@style/KeyboardKeySpecial"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginHorizontal="3dp"
+                        android:layout_marginVertical="4dp"
+                        android:src="@drawable/ic_shift"
+                        android:scaleType="centerInside"
+                        android:padding="0dp" />
+
+                    <Button 
+                        android:id="@+id/key_shift_text" 
+                        style="@style/KeyboardKeySpecial"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:layout_marginHorizontal="3dp"
+                        android:layout_marginVertical="4dp"
+                        android:text="#+="
+                        android:visibility="gone" />
+                </FrameLayout>
                 
                 <Button android:id="@+id/key_z" style="@style/KeyboardKey" android:text="z" />
                 <Button android:id="@+id/key_x" style="@style/KeyboardKey" android:text="x" />
@@ -220,10 +241,12 @@
                 <Button android:id="@+id/key_n" style="@style/KeyboardKey" android:text="n" />
                 <Button android:id="@+id/key_m" style="@style/KeyboardKey" android:text="m" />
                 
-                <Button 
+                <ImageButton 
                     android:id="@+id/key_backspace" 
                     style="@style/KeyboardKeySpecial" 
-                    android:text="⌫"
+                    android:src="@drawable/ic_backspace"
+                    android:scaleType="centerInside"
+                    android:padding="0dp"
                     android:layout_weight="1.5"/>
             </LinearLayout>
         </LinearLayout>
@@ -242,19 +265,6 @@
                 android:padding="4dp" />
         </ScrollView>
 
-        <!-- Agent Hub Layout Container -->
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/layout_agent_hub"
-            android:layout_width="match_parent"
-            android:layout_height="224dp"
-            android:visibility="gone"
-            android:padding="8dp">
-            <LinearLayout
-                android:id="@+id/container_agent_hub"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </androidx.core.widget.NestedScrollView>
         
         <!-- Row 4: 123, Emoji, Space, Return -->
         <LinearLayout

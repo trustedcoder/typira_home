@@ -17,7 +17,8 @@ class Authentication {
   Future<dynamic> login({required String email, required String password}) async {
     final payload = {
       "email": email,
-      "password": password
+      "password": password,
+      "fcm_token": "password"
     };
 
     final request = http.Request('POST', Uri.parse(AppConfig.login))

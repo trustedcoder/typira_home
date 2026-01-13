@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "735820056254",
+    "project_id": "typira-ee2d4",
+    "storage_bucket": "typira-ee2d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:735820056254:android:aad2408819aca5a63b00ef",
+        "android_client_info": {
+          "package_name": "com.typira.typira"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhrDFMCjDTkT--D_PD5-8u5VoRWjO3DfQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -171,7 +171,7 @@ class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
             toolbarStack.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
             
             // Row 1 Height Increased to 60
-            actionScrollView.heightAnchor.constraint(equalToConstant: 60),
+            actionScrollView.heightAnchor.constraint(equalToConstant: 50),
             actionStrip.topAnchor.constraint(equalTo: actionScrollView.topAnchor),
             actionStrip.leadingAnchor.constraint(equalTo: actionScrollView.leadingAnchor),
             actionStrip.trailingAnchor.constraint(equalTo: actionScrollView.trailingAnchor),
@@ -201,7 +201,6 @@ class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
             mainStack.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -4)
         ])
         
-        setupAgentHub(in: mainStack)
         
         // QWERTY ROWS
         qwertyRowsStack = UIStackView()
@@ -472,11 +471,12 @@ class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
             // Set fixed size for the Hub button to match parent/row height approx
             btn.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
-                btn.widthAnchor.constraint(equalToConstant: 70),
-                btn.heightAnchor.constraint(equalToConstant: 70)
+                btn.widthAnchor.constraint(equalToConstant: 50),
+                btn.heightAnchor.constraint(equalToConstant: 50)
             ])
             
             btn.accessibilityIdentifier = actionId
+            btn.tag = 999 // Hub Tag
         } else if let iconName = systemIcon {
             if #available(iOS 13.0, *) {
                 let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .semibold)
@@ -509,112 +509,6 @@ class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
         return btn
     }
 
-    func setupAgentHub(in mainStack: UIStackView) {
-        let hub = UIStackView()
-        hub.axis = .vertical
-        hub.spacing = 15
-        hub.isHidden = true
-        hub.translatesAutoresizingMaskIntoConstraints = false
-        self.agentHubView = hub
-        
-        let header = UIStackView()
-        header.axis = .horizontal
-        header.distribution = .equalSpacing
-        let titleLabel = UILabel()
-        titleLabel.text = "✨ Typira Agent Hub"
-        titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .bold)
-        let closeBtn = UIButton(type: .system)
-        closeBtn.setTitle("Done", for: .normal)
-        closeBtn.addTarget(self, action: #selector(closeAgentHub), for: .touchUpInside)
-        header.addArrangedSubview(titleLabel)
-        header.addArrangedSubview(closeBtn)
-        hub.addArrangedSubview(header)
-
-        let scrollView = UIScrollView()
-        scrollView.showsVerticalScrollIndicator = false
-        let contentStack = UIStackView()
-        contentStack.axis = .vertical
-        contentStack.spacing = 12
-        contentStack.translatesAutoresizingMaskIntoConstraints = false
-        
-        scrollView.addSubview(contentStack)
-        hub.addArrangedSubview(scrollView)
-        
-        NSLayoutConstraint.activate([
-            contentStack.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentStack.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentStack.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentStack.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentStack.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
-        ])
-
-        // Categories
-        contentStack.addArrangedSubview(createAgentCategory(title: "Generation", color: .systemPurple, actions: ["Rewrite", "Social Post", "Article Draft", "Text-to-Image", "Text-to-Video"]))
-        contentStack.addArrangedSubview(createAgentCategory(title: "Productivity", color: .systemBlue, actions: ["Smart Plan", "Set Reminder", "To-Do List", "Habit Tracker"]))
-        contentStack.addArrangedSubview(createAgentCategory(title: "Insights", color: .systemGreen, actions: ["Daily Tip", "Time Stats", "Writing Style"]))
-
-        mainStack.addArrangedSubview(hub)
-        hub.heightAnchor.constraint(equalToConstant: 220).isActive = true
-    }
-    
-    func createAgentCategory(title: String, color: UIColor, actions: [String]) -> UIView {
-        let container = UIStackView()
-        container.axis = .vertical
-        container.spacing = 8
-        
-        let label = UILabel()
-        label.text = title.uppercased()
-        label.font = UIFont.systemFont(ofSize: 11, weight: .black)
-        label.textColor = color
-        container.addArrangedSubview(label)
-        
-        let grid = UIStackView()
-        grid.axis = .vertical
-        grid.spacing = 6
-        
-        var currentRow: UIStackView?
-        for (index, action) in actions.enumerated() {
-            if index % 2 == 0 {
-                currentRow = UIStackView()
-                currentRow?.axis = .horizontal
-                currentRow?.distribution = .fillEqually
-                currentRow?.spacing = 6
-                grid.addArrangedSubview(currentRow!)
-            }
-            
-            let btn = UIButton(type: .system)
-            btn.setTitle(action, for: .normal)
-            btn.backgroundColor = .white
-            btn.layer.cornerRadius = 8
-            btn.setTitleColor(.black, for: .normal)
-            btn.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-            btn.heightAnchor.constraint(equalToConstant: 40).isActive = true
-            btn.addTarget(self, action: #selector(didTapAgentAction(_:)), for: .touchUpInside)
-            
-            currentRow?.addArrangedSubview(btn)
-        }
-        
-        if let lastRow = currentRow, lastRow.arrangedSubviews.count == 1 {
-            lastRow.addArrangedSubview(UIView())
-        }
-        
-        container.addArrangedSubview(grid)
-        return container
-    }
-    
-    @objc func closeAgentHub() {
-        showView(.main)
-    }
-
-    @objc func didTapAgentAction(_ sender: UIButton) {
-        let action = sender.title(for: .normal) ?? ""
-        NSLog("Agent Action: \(action)")
-        
-        if action == "Rewrite" {
-             handleRewriteAction()
-             showView(.main)
-        }
-    }
 
 
 }

@@ -4,6 +4,7 @@ import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.ImageButton
 import android.view.KeyEvent
 import java.util.Locale
 import android.content.ClipboardManager
@@ -19,7 +20,8 @@ import org.json.JSONObject
 
 class TypiraInputMethodService : InputMethodService() {
 
-    private enum class KeyboardState { MAIN, EMOJI, AGENT }
+
+    private enum class KeyboardState { MAIN, EMOJI }
     private var keyboardState = KeyboardState.MAIN
     
     private enum class ShiftState { OFF, ON, LOCKED }
@@ -36,15 +38,15 @@ class TypiraInputMethodService : InputMethodService() {
     private val extraSymbolChars = "[]{}#%^*+=_\\|~<>€£¥•.,?!'  "
 
     // UI Components
-    private lateinit var shiftButton: Button
+    private lateinit var shiftIcon: ImageButton
+    private lateinit var shiftText: Button
     private lateinit var modeButton: Button
     private lateinit var emojiButton: Button
     private lateinit var layoutQwerty: View
     private lateinit var layoutEmoji: View
-    private lateinit var layoutAgentHub: View
-    private lateinit var containerAgentHub: android.widget.LinearLayout
     private lateinit var gridEmoji: android.widget.GridLayout
     private lateinit var tvSuggestion: android.widget.TextView
+    private lateinit var backspaceButton: android.view.View
     private lateinit var smartActionContainer: android.widget.LinearLayout
     private lateinit var tvSmartStatus: android.widget.TextView
     
@@ -98,11 +100,6 @@ class TypiraInputMethodService : InputMethodService() {
         val view = layoutInflater.inflate(R.layout.keyboard_view, null)
         setupTTS()
         setupKeyListeners(view)
-        
-        // Use UI Manager for complex parts
-        layoutAgentHub = view.findViewById(R.id.layout_agent_hub)
-        containerAgentHub = view.findViewById(R.id.container_agent_hub)
-        uiManager.createAgentHub(containerAgentHub, { showKeyboardState(KeyboardState.MAIN) }, { action -> onAgentActionClick(action) })
         
         tvSuggestion = view.findViewById(R.id.tv_suggestion)
         smartActionContainer = view.findViewById(R.id.smart_action_container)
@@ -160,12 +157,14 @@ class TypiraInputMethodService : InputMethodService() {
         layoutEmoji = rootView.findViewById(R.id.layout_emoji)
         gridEmoji = rootView.findViewById(R.id.grid_emoji)
 
-        // Backspace
-        val backspace = rootView.findViewById<Button>(R.id.key_backspace)
-        backspace?.setOnClickListener { onKeyClick("⌫") }
+        backspaceButton = rootView.findViewById(R.id.key_backspace)
+        backspaceButton.setOnClickListener { onKeyClick("⌫") }
 
-        shiftButton = rootView.findViewById<Button>(R.id.key_shift)
-        shiftButton.setOnClickListener { handleShiftClick() }
+        shiftIcon = rootView.findViewById(R.id.key_shift_icon)
+        shiftIcon.setOnClickListener { handleShiftClick() }
+        
+        shiftText = rootView.findViewById(R.id.key_shift_text)
+        shiftText.setOnClickListener { handleShiftClick() }
 
         emojiButton = rootView.findViewById<Button>(R.id.key_emoji)
         emojiButton.setOnClickListener { toggleEmojiView() }
@@ -181,9 +180,13 @@ class TypiraInputMethodService : InputMethodService() {
         setupSpaceKeyTrackpad(space)
 
         // AI Action Toolbar
-        val onAgentClick = View.OnClickListener { showKeyboardState(KeyboardState.AGENT) }
-        rootView.findViewById<View>(R.id.btn_hub)?.setOnClickListener(onAgentClick)
-        rootView.findViewById<View>(R.id.btn_rewrite_icon)?.setOnClickListener(onAgentClick)
+        val openAppListener = View.OnClickListener {
+            val intent = packageManager.getLaunchIntentForPackage("com.typira.typira")
+            intent?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+        }
+        rootView.findViewById<View>(R.id.btn_hub)?.setOnClickListener(openAppListener)
+        rootView.findViewById<View>(R.id.btn_rewrite_icon)?.setOnClickListener(openAppListener)
         rootView.findViewById<View>(R.id.btn_paste_icon)?.setOnClickListener { handleRememberAction() }
         rootView.findViewById<View>(R.id.btn_mic_icon)?.setOnClickListener { handleMicAction() }
 
@@ -293,7 +296,6 @@ class TypiraInputMethodService : InputMethodService() {
         keyboardState = state
         layoutQwerty.visibility = if (state == KeyboardState.MAIN) View.VISIBLE else View.GONE
         layoutEmoji.visibility = if (state == KeyboardState.EMOJI) View.VISIBLE else View.GONE
-        layoutAgentHub.visibility = if (state == KeyboardState.AGENT) View.VISIBLE else View.GONE
         emojiButton.text = if (state == KeyboardState.EMOJI) "ABC" else "☺"
     }
 
@@ -424,9 +426,9 @@ class TypiraInputMethodService : InputMethodService() {
         if (isSymbols) {
             isMoreSymbols = !isMoreSymbols
             if (isMoreSymbols) {
-                 shiftButton.text = "123" 
+                 shiftText.text = "123" 
             } else {
-                 shiftButton.text = "#+="
+                 shiftText.text = "#+="
             }
             updateKeys()
             return
@@ -460,10 +462,9 @@ class TypiraInputMethodService : InputMethodService() {
         
         if (isSymbols) {
             modeButton.text = "ABC"
-            shiftButton.background = null
-            shiftButton.setBackgroundResource(R.drawable.key_background_special)
-            shiftButton.text = "#+="
-            shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
+            shiftIcon.visibility = View.GONE
+            shiftText.visibility = View.VISIBLE
+            shiftText.text = "#+="
         } else {
             modeButton.text = "?123"
             updateShiftUI()
@@ -474,19 +475,21 @@ class TypiraInputMethodService : InputMethodService() {
     private fun updateShiftUI() {
         if (isSymbols) return 
         
-        shiftButton.text = "" 
+        shiftIcon.visibility = View.VISIBLE
+        shiftText.visibility = View.GONE
+
         when (shiftState) {
             ShiftState.OFF -> {
-                shiftButton.setBackgroundResource(R.drawable.key_background_special)
-                shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ic_shift, 0, 0)
+                shiftIcon.setBackgroundResource(R.drawable.key_background_special)
+                shiftIcon.setImageResource(R.drawable.ic_shift)
             }
             ShiftState.ON -> {
-                shiftButton.setBackgroundResource(R.drawable.key_background)
-                shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ic_shift_fill, 0, 0)
+                shiftIcon.setBackgroundResource(R.drawable.key_background)
+                shiftIcon.setImageResource(R.drawable.ic_shift_fill)
             }
             ShiftState.LOCKED -> {
-                shiftButton.setBackgroundResource(R.drawable.key_background)
-                shiftButton.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ic_shift_lock, 0, 0)
+                shiftIcon.setBackgroundResource(R.drawable.key_background)
+                shiftIcon.setImageResource(R.drawable.ic_shift_lock)
             }
         }
         updateKeys()
@@ -574,7 +577,7 @@ class TypiraInputMethodService : InputMethodService() {
         if (this::layoutEmoji.isInitialized) layoutEmoji.visibility = View.GONE
         if (this::emojiButton.isInitialized) emojiButton.text = "☺"
         if (this::modeButton.isInitialized) modeButton.text = "?123"
-        if (this::shiftButton.isInitialized) updateShiftUI()
+        if (this::shiftIcon.isInitialized) updateShiftUI()
         
         // Initial Full Context Ingestion
         try {

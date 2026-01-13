@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -8,11 +9,15 @@ import 'package:typira/storage/session_manager.dart';
 import 'activities/login_activity.dart';
 import 'activities/register_activity.dart';
 import 'activities/splash_activity.dart';
+import 'activities/home_activity.dart';
 import 'constants/app_theme.dart';
 import 'controllers/life_cycle.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await SessionManager.initSharedPrefrence();
   await ScreenUtil.ensureScreenSize();
   runApp(const ScreenSize());
@@ -65,6 +70,12 @@ class MyApp extends StatelessWidget {
           name: '/register',
           page: () => const RegisterActivity(),
           transition: Transition.rightToLeft,
+          curve: Curves.easeInOut,
+        ),
+        GetPage(
+          name: '/home',
+          page: () => const HomeActivity(),
+          transition: Transition.fadeIn,
           curve: Curves.easeInOut,
         ),
       ],
