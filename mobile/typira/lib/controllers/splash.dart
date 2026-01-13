@@ -9,7 +9,7 @@ class SplashController extends GetxController {
   void onInit() async {
     super.onInit();
     await Future.delayed(const Duration(seconds: 2));
-    checkLoginStatus();
+    checkSeenIntro();
   }
 
   void checkLoginStatus(){
@@ -18,6 +18,15 @@ class SplashController extends GetxController {
     }
     else{
       RouteConfig.navigateToReplacePage("/login");
+    }
+  }
+
+  void checkSeenIntro(){
+    if(SessionManager.isSeenIntro()){
+      checkLoginStatus();
+    }
+    else{
+      RouteConfig.navigateToReplacePage("/intro");
     }
   }
 
