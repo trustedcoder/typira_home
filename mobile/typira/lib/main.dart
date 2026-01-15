@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:typira/activities/intro_activity.dart';
+import 'package:typira/activities/setup_activity.dart';
 import 'firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -64,6 +65,12 @@ class MyApp extends StatelessWidget {
         GetPage(
           name: '/intro',
           page: () => const IntroActivity(),
+          transition: Transition.rightToLeft,
+          curve: Curves.easeInOut,
+        ),
+        GetPage(
+          name: '/setup',
+          page: () => const SetupActivity(),
           transition: Transition.rightToLeft,
           curve: Curves.easeInOut,
         ),

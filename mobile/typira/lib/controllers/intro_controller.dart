@@ -49,8 +49,8 @@ class IntroController extends GetxController {
   }
 
   Future<void> finishIntro() async {
-    SessionManager.setSeenIntro(true);
-    checkLoginStatus();
+    // Navigate to Setup Screen
+    RouteConfig.navigateToReplacePage("/setup");
   }
 
   void checkLoginStatus(){
