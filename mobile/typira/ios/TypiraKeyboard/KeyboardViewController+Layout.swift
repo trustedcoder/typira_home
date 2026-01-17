@@ -503,6 +503,9 @@ class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
             btn.contentEdgeInsets = UIEdgeInsets(top: 4, left: 12, bottom: 4, right: 12)
         }
         
+        btn.accessibilityIdentifier = actionId
+        btn.tag = (actionId == "hub") ? 999 : 0
+        
         // Fix: Use didTapAgentAction or didTapSuggestion properly depending on context
         // This was used for action strip buttons
         btn.addTarget(self, action: #selector(didTapActionChip(_:)), for: .touchUpInside)

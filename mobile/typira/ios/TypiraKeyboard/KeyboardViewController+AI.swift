@@ -15,7 +15,7 @@ extension KeyboardViewController {
              return
         }
 
-        guard let url = URL(string: "http://localhost:8000/suggest") else { return }
+        guard let url = URL(string: "http://localhost:7009/suggest") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -97,6 +97,8 @@ extension KeyboardViewController {
                 self.suggestionLabel?.text = "Typira is working on: \(title)..."
             }
             return
+        } else {
+            NSLog("DEBUG: [Action] Metadata lookup FAILED for actionId: '\(actionId)'. Current actions: \(currentSmartActions.count)")
         }
         
         // Legacy/Fixed Action Strip Buttons
@@ -128,20 +130,29 @@ extension KeyboardViewController {
     private func openApp(url: URL) {
         NSLog("DEBUG: [Action] Attempting to open URL: \(url.absoluteString)")
         
-        var responder: UIResponder? = self as UIResponder
-        let selector = NSSelectorFromString("openURL:")
-        while responder != nil {
-            if responder!.responds(to: selector) && responder != self {
-                responder!.perform(selector, with: url)
-                NSLog("DEBUG: [Action] Found responder for openURL:")
-                return
+        // 1. Try URLSession/NSExtensionContext standard way (Preferred)
+        self.extensionContext?.open(url, completionHandler: { success in
+            if success {
+                NSLog("DEBUG: [Action] Successfully opened URL via extensionContext")
+            } else {
+                NSLog("DEBUG: [Action] Failed to open URL via extensionContext, trying responder chain...")
+                
+                // 2. Responder Chain Hack (Legacy Fallback)
+                DispatchQueue.main.async {
+                    var responder: UIResponder? = self
+                    let selector = NSSelectorFromString("openURL:")
+                    while responder != nil {
+                        if responder!.responds(to: selector) {
+                            responder!.perform(selector, with: url)
+                            NSLog("DEBUG: [Action] Triggered openURL: on responder chain")
+                            return
+                        }
+                        responder = responder?.next
+                    }
+                    NSLog("DEBUG: [Action] CRITICAL: No responder found for openURL:")
+                }
             }
-            responder = responder?.next
-        }
-        
-        // Final fallback to extensionContext
-        NSLog("DEBUG: [Action] Fallback to extensionContext.open")
-        self.extensionContext?.open(url, completionHandler: nil)
+        })
     }
     
     @objc func didTapSuggestionLabel(_ gesture: UITapGestureRecognizer) {
