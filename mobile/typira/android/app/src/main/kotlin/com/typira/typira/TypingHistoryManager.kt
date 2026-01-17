@@ -127,7 +127,6 @@ class TypingHistoryManager(
 
         socket?.emit("analyze", json)
     }
-    }
 
     private fun isPasswordField(info: EditorInfo?): Boolean {
         if (info == null) return false
@@ -179,7 +178,6 @@ class TypingHistoryManager(
         json.put("app_context", lastEditorInfo?.packageName ?: "unknown")
 
         socket?.emit("analyze", json)
-    }
     }
 
     fun disconnect() {
