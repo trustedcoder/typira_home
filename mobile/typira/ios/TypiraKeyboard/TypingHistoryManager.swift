@@ -131,7 +131,6 @@ class TypingHistoryManager {
         
         socket?.emit("analyze", payload)
     }
-    }
 
     func sendFullContext(_ fullText: String, proxy: UITextDocumentProxy) {
         if proxy.isSecureTextEntry == true {
@@ -147,7 +146,6 @@ class TypingHistoryManager {
         ]
         
         socket?.emit("analyze", payload)
-    }
     }
     
     func performAction(id: String, type: String, payload: String?, context: String) {
