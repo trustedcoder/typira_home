@@ -14,7 +14,7 @@ class TypingHistoryManager {
     var onResultReceived: ((String) -> Void)?
     
     // App Group for sharing JWT token with Flutter app
-    private let appGroupSuiteName: String? = nil 
+    private let appGroupSuiteName: String? = "group.com.typira.shared" 
     
     private var jwtToken: String? {
         let prefs = appGroupSuiteName != nil ? UserDefaults(suiteName: appGroupSuiteName) : UserDefaults.standard
@@ -24,7 +24,7 @@ class TypingHistoryManager {
         return nil
     }
     
-    private let manager = SocketManager(socketURL: URL(string: "http://localhost:7009")!, config: [.log(false), .compress])
+    private var manager: SocketManager?
     private var socket: SocketIOClient?
  
     init() {
@@ -32,10 +32,17 @@ class TypingHistoryManager {
     }
     
     private func setupSocket() {
-        socket = manager.defaultSocket
+        var config: SocketIOClientConfiguration = [.log(false), .compress]
         
-        socket?.on(clientEvent: .connect) { data, ack in
-            NSLog("DEBUG: [TypiraSocket] Connected to Backend")
+        if let token = jwtToken {
+            let bearerToken = token.hasPrefix("Bearer ") ? token : "Bearer \(token)"
+            config.insert(.extraHeaders(["Authorization": bearerToken, "authorization": bearerToken]))
+        }
+        
+        manager = SocketManager(socketURL: URL(string: "http://localhost:7009")!, config: config)
+        socket = manager?.defaultSocket
+        
+        socket?.on(clientEvent: .connect) { [weak self] data, ack in
         }
         
         socket?.on("thought_update") { [weak self] data, ack in
@@ -59,7 +66,6 @@ class TypingHistoryManager {
         }
         
         socket?.on(clientEvent: .error) { data, ack in
-            NSLog("DEBUG: [TypiraSocket] Error: \(data)")
         }
         
         socket?.connect()
@@ -117,7 +123,6 @@ class TypingHistoryManager {
         let cleanDelta = scrubPII(incrementalDelta)
         
         let payload: [String: Any] = [
-            "token": jwtToken ?? "",
             "text": cleanFullText,
             "incremental_delta": cleanDelta,
             "is_full_context": true,
@@ -125,7 +130,7 @@ class TypingHistoryManager {
         ]
         
         socket?.emit("analyze", payload)
-        NSLog("DEBUG: [TypiraSocket] Synced Scrubbed Context (\(cleanFullText.count) chars) to Backend")
+    }
     }
 
     func sendFullContext(_ fullText: String, proxy: UITextDocumentProxy) {
@@ -136,19 +141,17 @@ class TypingHistoryManager {
         let cleanFullText = scrubPII(fullText)
         
         let payload: [String: Any] = [
-            "token": jwtToken ?? "",
             "text": cleanFullText,
             "is_full_context": true,
             "app_context": "ios.extension.keyboard"
         ]
         
         socket?.emit("analyze", payload)
-        NSLog("DEBUG: [TypiraSocket] Emitting scrubbed 'full_context' for \(cleanFullText.count) chars")
+    }
     }
     
     func performAction(id: String, type: String, payload: String?, context: String) {
         let eventPayload: [String: Any] = [
-            "token": jwtToken ?? "",
             "action_id": id,
             "type": type,
             "payload": payload ?? "",
@@ -156,6 +159,5 @@ class TypingHistoryManager {
         ]
         
         socket?.emit("perform_action", eventPayload)
-        NSLog("DEBUG: [TypiraSocket] Emitting 'perform_action': \(id)")
     }
 }

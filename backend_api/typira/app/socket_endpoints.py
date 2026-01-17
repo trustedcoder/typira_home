@@ -1,15 +1,26 @@
-from flask import request
+from flask import request, session
 from flask_socketio import emit
 from app import socketio, db
 from app.models.context import TypingHistory
+from app.models.users import User
 # from app.helpers.auth_helpers import token_required_socket # We need a socket version of this
 import datetime
 import time
 
 @socketio.on('connect')
-def handle_connect():
-    print(f"Client connected: {request.sid}")
-    emit('con_response', {'status': 'connected'})
+def handle_connect(auth=None):
+    auth_token = request.headers.get('Authorization') or \
+                 request.headers.get('HTTP_AUTHORIZATION')
+
+    if auth_token:
+        if auth_token.startswith("Bearer "):
+            auth_token = auth_token[7:]
+            
+        resp = User.decode_auth_token(auth_token)
+        if resp['status'] == 1:
+            session['user_id'] = resp['user_id']
+
+    emit('con_response', {'status': 'connected', 'authenticated': 'user_id' in session})
 
 def async_persist_context(app, user_id, text, app_context, is_full):
     """
@@ -25,7 +36,6 @@ def async_persist_context(app, user_id, text, app_context, is_full):
 
         atoms = split_into_sentences(text)
         num_atoms = len(atoms)
-        print(f"DEBUG: [Dedupe] Processing {num_atoms} atoms from source text")
         
         for i, atom in enumerate(atoms):
             if not atom or len(atom.strip()) < 3:
@@ -33,7 +43,6 @@ def async_persist_context(app, user_id, text, app_context, is_full):
                 
             clean_text = scrub_pii(atom)
             is_last = (i == num_atoms - 1)
-            print(f"DEBUG: [Dedupe] Atom {i+1}/{num_atoms}: '{clean_text[:30]}...' (is_last: {is_last})")
             
             # 1. Expansion Absorption Logic (Only for the last fragment/atom)
             if is_last:
@@ -51,7 +60,6 @@ def async_persist_context(app, user_id, text, app_context, is_full):
                     last_entry.semantic_hash = s_hash
                     last_entry.timestamp = datetime.datetime.utcnow()
                     db.session.commit()
-                    print(f"DEBUG: [Dedupe] ABSORBED expansion: '{clean_text[:20]}...' (Hash: {s_hash[:8] if s_hash else 'None'})")
                     continue
 
             # 2. Standard Semantic Deduplication / Novel Entry (Upsert)
@@ -67,7 +75,6 @@ def async_persist_context(app, user_id, text, app_context, is_full):
                     existing.frequency += 1
                     existing.timestamp = datetime.datetime.utcnow()
                     existing.content = clean_text 
-                    print(f"DEBUG: [Dedupe] UPDATED existing intent: {s_hash[:8]} (Freq: {existing.frequency})")
                 else:
                     new_entry = TypingHistory(
                         user_id=user_id, 
@@ -77,31 +84,37 @@ def async_persist_context(app, user_id, text, app_context, is_full):
                         timestamp=datetime.datetime.utcnow()
                     )
                     db.session.add(new_entry)
-                    print(f"DEBUG: [Dedupe] CREATED new entry for intent: {s_hash[:8]}")
                 
                 db.session.commit()
-            else:
-                print(f"DEBUG: [Dedupe] SKIP: Could not generate semantic hash for atom")
 
 @socketio.on('analyze')
 def handle_analyze(data):
-    """
-    Handles typing history chunks via WebSocket.
-    Expected data: {'token': '...', 'text': '...', 'app_context': '...'}
-    """
+    # Priority: Session > Headers > Data Token
+    user_id = session.get('user_id')
+    
+    if not user_id:
+        auth_token = request.headers.get('Authorization') or \
+                     request.headers.get('HTTP_AUTHORIZATION')
+        if auth_token:
+            if auth_token.startswith("Bearer "):
+                auth_token = auth_token[7:]
+            resp = User.decode_auth_token(auth_token)
+            if resp['status'] == 1:
+                user_id = resp['user_id']
+                session['user_id'] = user_id 
+    
+    if not user_id:
+        return
+    
     from flask import current_app
     text = data.get('text')
     app_context = data.get('app_context')
     is_full = data.get('is_full_context', False)
 
-    print(f"Analyzing text from {request.sid}: {text}...")
-
-    # Offload persistence to background thread for zero-latency suggestions
-    # We pass the real app object to the thread so we can push an app context
     socketio.start_background_task(
         async_persist_context, 
         current_app._get_current_object(),
-        1, text, app_context, is_full
+        user_id, text, app_context, is_full
     )
 
     # --- Agentic AI Suggestion Engine (Gemini 3) ---
@@ -109,9 +122,9 @@ def handle_analyze(data):
     
     # 1. Gather Personal Context from TypingHistory
     # Get top 30 most frequent intents
-    frequent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.frequency.desc()).limit(30).all()
+    frequent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.frequency.desc()).limit(30).all()
     # Get last 20 recent sentences
-    recent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.timestamp.desc()).limit(20).all()
+    recent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.timestamp.desc()).limit(20).all()
     
     combined_history = list(set([h.content for h in frequent_history] + [h.content for h in recent_history]))
     
@@ -126,7 +139,6 @@ def handle_analyze(data):
         
     # 4. Finalize and Show Actions
     emit('thought_update', {'text': analysis.get('final_thought', 'Ready.')})
-    print(analysis.get('actions', []))
     emit('suggestion_ready', {
         'thought': analysis.get('final_thought', ''),
         'actions': analysis.get('actions', [])
@@ -138,6 +150,21 @@ def handle_perform_action(data):
     Handles iterative agentic loops (Step 2 of an action).
     Expected data: {'action_id': '...', 'payload': '...', 'context': '...'}
     """
+    user_id = session.get('user_id')
+    if not user_id:
+        # Attempt fallback from headers
+        auth_token = request.headers.get('Authorization')
+        if auth_token:
+            if auth_token.startswith("Bearer "):
+                auth_token = auth_token[7:]
+            resp = User.decode_auth_token(auth_token)
+            if resp['status'] == 1:
+                user_id = resp['user_id']
+                session['user_id'] = user_id
+                
+    if not user_id:
+        return
+    
     from app.business.gemini_business import GeminiBusiness
     action_id = data.get('action_id')
     payload = data.get('payload')
@@ -146,8 +173,8 @@ def handle_perform_action(data):
     emit('thought_update', {'text': f"Executing {action_id}..."})
     
     # Fetch History for personalization
-    frequent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.frequency.desc()).limit(30).all()
-    recent_history = TypingHistory.query.filter_by(user_id=1).order_by(TypingHistory.timestamp.desc()).limit(20).all()
+    frequent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.frequency.desc()).limit(30).all()
+    recent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.timestamp.desc()).limit(20).all()
     combined_history = list(set([h.content for h in frequent_history] + [h.content for h in recent_history]))
     
     # Call the Agentic Brain for specialized execution

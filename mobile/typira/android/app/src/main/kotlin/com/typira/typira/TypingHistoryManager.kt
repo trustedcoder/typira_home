@@ -37,35 +37,32 @@ class TypingHistoryManager(
         val rawToken = prefs.getString("flutter.auth", null)
         if (rawToken != null) {
             jwtToken = rawToken.removePrefix("\"").removeSuffix("\"")
-            Log.d("TypiraHistory", "JWT Token loaded for Socket")
         }
     }
 
     private fun setupSocket() {
         try {
-            Log.d("TypiraSocket", "Attempting to connect to http://10.0.2.2:7009")
             val opts = IO.Options()
             opts.forceNew = true
             opts.reconnection = true
+            
+            jwtToken?.let {
+                val headers = mutableMapOf<String, List<String>>()
+                val bearerToken = if (it.startsWith("Bearer ")) it else "Bearer $it"
+                
+                headers["Authorization"] = listOf(bearerToken)
+                headers["authorization"] = listOf(bearerToken)
+                opts.extraHeaders = headers
+            }
+
             socket = IO.socket("http://10.0.2.2:7009", opts)
-
-            socket?.on(Socket.EVENT_CONNECT) {
-                Log.d("TypiraSocket", "SUCCESS: Connected to Backend")
-            }
-
-            socket?.on(Socket.EVENT_CONNECT_ERROR) { args ->
-                Log.e("TypiraSocket", "CONNECTION ERROR: ${args.getOrNull(0)}")
-            }
 
             socket?.on("thought_update") { args ->
                 try {
                     val data = args[0] as JSONObject
                     val thought = data.getString("text")
-                    Log.d("TypiraSocket", "Received thought: $thought")
                     handler.post { onThoughtUpdate("💭 $thought") }
-                } catch (e: Exception) {
-                    Log.e("TypiraSocket", "Error parsing thought_update: ${e.message}")
-                }
+                } catch (e: Exception) {}
             }
 
             socket?.on("suggestion_ready") { args ->
@@ -75,8 +72,6 @@ class TypingHistoryManager(
                     val actions = data.optJSONArray("actions") ?: org.json.JSONArray()
                     val result = data.optString("result", "")
                     
-                    Log.d("TypiraSocket", "Received suggestion: $thought with ${actions.length()} actions")
-                    
                     handler.post { 
                         onThoughtUpdate("💡 $thought")
                         onActionsReceived(actions)
@@ -84,31 +79,21 @@ class TypingHistoryManager(
                             onResultReceived(result)
                         }
                     }
-                } catch (e: Exception) {
-                    Log.e("TypiraSocket", "Error parsing suggestion_ready: ${e.message}")
-                }
-            }
-
-            socket?.on(Socket.EVENT_DISCONNECT) {
-                Log.d("TypiraSocket", "Socket Disconnected")
+                } catch (e: Exception) {}
             }
 
             socket?.connect()
-        } catch (e: URISyntaxException) {
-            Log.e("TypiraSocket", "URL Error: ${e.message}")
-        }
+        } catch (e: URISyntaxException) {}
     }
 
     fun performAction(id: String, type: String, payload: String?, contextStr: String) {
         val json = JSONObject()
-        json.put("token", jwtToken)
         json.put("action_id", id)
         json.put("type", type)
         json.put("payload", payload ?: "")
         json.put("context", contextStr)
 
         socket?.emit("perform_action", json)
-        Log.d("TypiraSocket", "Emitting 'perform_action': $id")
     }
 
     fun onTextTyped(text: CharSequence, editorInfo: EditorInfo?) {
@@ -136,13 +121,12 @@ class TypingHistoryManager(
         val cleanFullText = scrubPII(fullText)
 
         val json = JSONObject()
-        json.put("token", jwtToken)
         json.put("text", cleanFullText)
         json.put("is_full_context", true) // Tag it so backend knows
         json.put("app_context", editorInfo?.packageName ?: "unknown")
 
         socket?.emit("analyze", json)
-        Log.d("TypiraSocket", "Sent Scrubbed Full Context: ${cleanFullText.length} chars")
+    }
     }
 
     private fun isPasswordField(info: EditorInfo?): Boolean {
@@ -189,14 +173,13 @@ class TypingHistoryManager(
         val cleanDelta = scrubPII(contentToSend)
 
         val json = JSONObject()
-        json.put("token", jwtToken)
         json.put("text", cleanFullText)
         json.put("incremental_delta", cleanDelta)
         json.put("is_full_context", true)
         json.put("app_context", lastEditorInfo?.packageName ?: "unknown")
 
         socket?.emit("analyze", json)
-        Log.d("TypiraSocket", "Synced Scrubbed Context (${cleanFullText.length} chars) to Backend")
+    }
     }
 
     fun disconnect() {
