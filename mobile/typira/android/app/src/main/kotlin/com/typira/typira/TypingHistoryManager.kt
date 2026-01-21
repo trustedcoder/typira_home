@@ -55,7 +55,7 @@ class TypingHistoryManager(
                 opts.extraHeaders = headers
             }
 
-            socket = IO.socket("http://10.0.2.2:7009", opts)
+            socket = IO.socket("http://10.0.2.2:7009/agent", opts)
 
             socket?.on("thought_update") { args ->
                 try {

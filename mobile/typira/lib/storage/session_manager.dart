@@ -8,6 +8,7 @@ class SessionManager {
   static const String keyIsLoggedIn = "isLoggedIn";
   static const String keyAuth = "auth";
   static const String appGroupId = "group.com.typira.shared";
+  static const String keyUserName = "userName";
 
   static Future initSharedPrefrence() async {
     prefs = await SharedPreferences.getInstance();
@@ -49,6 +50,14 @@ class SessionManager {
       // Note: We use the 'flutter.' prefix to match SharedPreferences standard
       SharedPreferenceAppGroup.setString("flutter.$keyAuth", value);
     }
+  }
+
+  static String getUserName() {
+    return SessionManager.prefs!.getString(keyUserName) ?? "";
+  }
+
+  static void setUserName(value) {
+    SessionManager.prefs!.setString(keyUserName, value);
   }
 
   static void resetApp() {

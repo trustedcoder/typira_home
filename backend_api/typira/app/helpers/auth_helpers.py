@@ -11,6 +11,10 @@ def token_required(f):
 
         try:
             auth_token = auth_header
+            if auth_token.startswith("Bearer "):
+                auth_token = auth_token[7:]
+
+            print(auth_token)
         except IndexError:
             return {'status': 0, 'message': 'Bearer token malformed'}, 401
 
@@ -19,6 +23,12 @@ def token_required(f):
         if decoded_token['status'] == 0:
             return decoded_token, 401
 
-        kwargs['user_id'] = decoded_token['user_id']
+        user_id = decoded_token['user_id']
+        current_user = User.query.filter_by(id=user_id).first()
+        if not current_user:
+            return {'status': 0, 'message': 'User not found'}, 404
+
+        kwargs['user_id'] = user_id
+        kwargs['current_user'] = current_user
         return f(*args, **kwargs)
     return decorated

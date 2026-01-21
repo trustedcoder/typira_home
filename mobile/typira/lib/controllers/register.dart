@@ -42,6 +42,7 @@ class RegisterController extends GetxController {
         if (resp['status'] == 1) {
           SessionManager.setAuth(resp['authorization']);
           SessionManager.setLoggedIn(true);
+          SessionManager.setUserName(resp['name']);
           Get.offAllNamed("/home");
         }
         else {

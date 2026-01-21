@@ -22,5 +22,13 @@
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Typira needs microphone access for AI Voice Input.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Typira needs access to your calendar to create and manage events for you.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Typira needs full access to your calendar to create and manage events for you.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Typira needs access to add events to your calendar.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Typira needs access to your reminders to create and manage tasks for you.</string>
 </dict>
 </plist>

@@ -2,7 +2,7 @@ import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import '../packages/sliding_up_panel/sliding_up_panel.dart';
 
-enum InputChannel { none, camera, mic, keyboard }
+enum InputChannel { none, camera, mic, keyboard, action_input, result }
 
 class HomeInputController extends GetxController {
   

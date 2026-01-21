@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../constants/app_theme.dart';
 import '../controllers/home.dart';
 import '../controllers/home_input.dart';
-import '../packages/sliding_up_panel/sliding_up_panel.dart';
 import '../packages/sliding_up_panel/sliding_up_panel.dart';
 import '../fragments/memory_fragment.dart';
 import '../fragments/insights_fragment.dart';
@@ -74,33 +74,25 @@ class HomeActivity extends StatelessWidget {
 
   Widget _buildHomeTab(BuildContext context, HomeController controller) {
     return SafeArea(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(height: 20.h),
-              Obx(() => _buildHeader(context, controller)),
-              SizedBox(height: 40.h),
-              Obx(() => _buildAgentCore(context, controller)),
-              SizedBox(height: 40.h),
-              Obx(() => _buildDialogueBox(context, controller)),
-              SizedBox(height: 40.h),
-              _buildInputChannels(context),
-            ],
-          ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 10.h),
+            Obx(() => _buildHeader(context, controller)),
+            SizedBox(height: 5.h),
+            Obx(() => _buildAgentCore(context, controller)),
+            SizedBox(height: 45.h),
+            // Make dialogue box take the remaining space
+            Expanded(child: Obx(() => _buildDialogueBox(context, controller))),
+            SizedBox(height: 10.h),
+            Expanded(child: _buildInputChannels(context)),
+            SizedBox(height: 40.h),
+          ],
         ),
       ),
     );
-  }
-
-  Widget _buildMemoryTab() {
-    return const MemoryFragment();
-  }
-
-  Widget _buildInsightsTab() {
-    return const InsightsFragment();
   }
 
   Widget _buildHeader(BuildContext context, HomeController controller) {
@@ -111,10 +103,10 @@ class HomeActivity extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Good Morning, Celestine", // Dynamic name later
+              "${_getTimeBasedGreeting()}, ${controller.userName.value}",
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 20.sp,
+                fontSize: 16.sp,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Inter', // Assuming standard font
               ),
@@ -124,7 +116,7 @@ class HomeActivity extends StatelessWidget {
                 Container(
                   width: 8.w, height: 8.w,
                   decoration: BoxDecoration(
-                    color: controller.isOffline.value ? Colors.red : AppTheme.primaryColor,
+                    color: controller.isOffline.value ? Colors.red : AppTheme.greenColor,
                     shape: BoxShape.circle
                   ),
                 ),
@@ -132,7 +124,7 @@ class HomeActivity extends StatelessWidget {
                 Text(
                   controller.isOffline.value ? "System Offline" : "System Online • Ready",
                   style: TextStyle(
-                    color: controller.isOffline.value ? Colors.red : AppTheme.primaryColor,
+                    color: controller.isOffline.value ? Colors.red : AppTheme.greenColor,
                     fontSize: 12.sp,
                     fontWeight: FontWeight.w500,
                   ),
@@ -141,15 +133,26 @@ class HomeActivity extends StatelessWidget {
             ),
           ],
         ),
-        IconButton(
-          onPressed: () {
-            // Toggle offline mode for demo
-            controller.isOffline.value = !controller.isOffline.value;
-          }, 
-          icon: Icon(Icons.settings, color: Colors.white54)
-        )
+        // IconButton(
+        //   onPressed: () {
+        //     // Toggle offline mode for demo
+        //     controller.isOffline.value = !controller.isOffline.value;
+        //   },
+        //   icon: Icon(Icons.settings, color: Colors.white54)
+        // )
       ],
     );
+  }
+
+  String _getTimeBasedGreeting() {
+    var hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good Morning';
+    } else if (hour < 17) {
+      return 'Good Afternoon';
+    } else {
+      return 'Good Evening';
+    }
   }
 
   Widget _buildAgentCore(BuildContext context, HomeController controller) {
@@ -158,8 +161,8 @@ class HomeActivity extends StatelessWidget {
 
     return Center(
       child: Container(
-        width: 200.w,
-        height: 200.w,
+        width: 150.w,
+        height: 150.w,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: RadialGradient(
@@ -172,8 +175,8 @@ class HomeActivity extends StatelessWidget {
         ),
         child: Center(
           child: Container(
-            width: 120.w,
-            height: 120.w,
+            width: 100.w,
+            height: 100.w,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.black,
@@ -203,11 +206,12 @@ class HomeActivity extends StatelessWidget {
   Widget _buildDialogueBox(BuildContext context, HomeController controller) {
     // If we're fully idle/offline, maybe hide it? For now keep it visible as "System Status"
     
-    bool isWorking = controller.agentState.value == 1;
+    bool isWorking = controller.agentState.value == 2;
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(20.w),
+      constraints: BoxConstraints(minHeight: 120.h), // Minimum height, but lets Expanded control max
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20.r),
@@ -221,54 +225,84 @@ class HomeActivity extends StatelessWidget {
                  children: [
                    SizedBox(width: 16.w, height: 16.w, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentColor)),
                    SizedBox(width: 12.w),
-                   Text("AGENT ACTIVE", style: TextStyle(color: AppTheme.accentColor, fontSize: 10.sp, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                   Text("AGENT THINKING", style: TextStyle(color: AppTheme.accentColor, fontSize: 10.sp, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                  ],
                ),
                SizedBox(height: 12.h),
-               Text(
-                 controller.currentThought.value,
-                 style: TextStyle(color: Colors.white, fontSize: 16.sp, fontFamily: 'Courier'), // Monospace for "Terminal" feel
+               Expanded(
+                 child: SingleChildScrollView(
+                   child: Text(
+                     controller.currentThought.value,
+                     style: TextStyle(color: Colors.white, fontSize: 16.sp, fontFamily: 'Courier'), // Monospace for "Terminal" feel
+                   ),
+                 ),
                ),
             ],
           )
         : Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            controller.dialogueTitle.value,
-            style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            controller.dialogueBody.value,
-            style: TextStyle(color: Colors.white70, fontSize: 14.sp),
-          ),
-          SizedBox(height: 16.h),
-          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildReplyChip("Approve", () => controller.startDrafting()),
-              SizedBox(width: 10.w),
-              _buildReplyChip("Decline", () => controller.declineProposal()),
+              Row(
+                children: [
+                  Icon(Icons.auto_awesome, color: AppTheme.greenColor, size: 16.sp),
+                  SizedBox(width: 8.w),
+                  Text(
+                    controller.dialogueTitle.value.toUpperCase(),
+                    style: TextStyle(color: AppTheme.greenColor, fontSize: 12.sp, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8.h),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Text(
+                    controller.dialogueBody.value,
+                    style: TextStyle(color: Colors.white, fontSize: 15.sp, fontWeight: FontWeight.w400),
+                  ),
+                ),
+              ),
+              if (controller.agentState.value == 1 && controller.dynamicActions.isNotEmpty) ...[
+                SizedBox(height: 12.h),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: controller.dynamicActions.map((action) {
+                      final index = controller.dynamicActions.indexOf(action);
+                      return Padding(
+                        padding: EdgeInsets.only(right: 12.w),
+                        child: _buildReplyChip(
+                          action['label'] ?? "Select", 
+                          () => controller.handleDynamicAction(action),
+                          isPrimary: index == 0 && action['id'] != "none" && action['id'] != "decline",
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                )
+              ]
             ],
-          )
-        ],
-      ),
+          ),
     );
   }
 
-  Widget _buildReplyChip(String label, VoidCallback onTap) {
+  Widget _buildReplyChip(String label, VoidCallback onTap, {bool isPrimary = false}) {
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(20.r),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
         decoration: BoxDecoration(
-          color: AppTheme.primaryColor.withOpacity(0.2),
+          color: isPrimary ? AppTheme.primaryColor : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(20.r),
-          border: Border.all(color: AppTheme.primaryColor.withOpacity(0.5)),
+          border: Border.all(color: isPrimary ? AppTheme.primaryColor : Colors.white.withOpacity(0.1)),
         ),
         child: Text(
           label,
-          style: TextStyle(color: AppTheme.primaryColor, fontSize: 12.sp, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: isPrimary ? Colors.black : Colors.white, 
+            fontSize: 13.sp, 
+            fontWeight: FontWeight.bold
+          ),
         ),
       ),
     );
@@ -298,6 +332,10 @@ class HomeActivity extends StatelessWidget {
         return _buildMicPanel();
       case InputChannel.keyboard:
         return _buildKeyboardPanel(inputController);
+      case InputChannel.action_input:
+        return _buildActionInputPanel(inputController);
+      case InputChannel.result:
+        return _buildResultPanel();
       default:
         return SizedBox();
     }
@@ -355,7 +393,10 @@ class HomeActivity extends StatelessWidget {
         children: [
           Center(child: Container(width: 60.w, height: 6.h, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)))),
           SizedBox(height: 20.h),
-          Text("Agent Instruction", style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)),
+          Text(
+            "Agent Instruction", 
+            style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)
+          ),
           SizedBox(height: 20.h),
           Expanded(
             child: Container(
@@ -391,6 +432,161 @@ class HomeActivity extends StatelessWidget {
     );
   }
 
+  Widget _buildActionInputPanel(HomeInputController inputController) {
+    final homeController = Get.find<HomeController>();
+    return Padding(
+      padding: EdgeInsets.all(24.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(width: 60.w, height: 6.h, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)))),
+          SizedBox(height: 20.h),
+          Text(
+            "Tell Typira more", 
+            style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)
+          ),
+          SizedBox(height: 20.h),
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: Colors.black26, 
+                borderRadius: BorderRadius.circular(16.r)
+              ),
+              child: TextField(
+                controller: inputController.textInputController,
+                maxLines: null,
+                autofocus: true,
+                style: TextStyle(color: Colors.white, fontSize: 16.sp),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: "Type your response...",
+                  hintStyle: TextStyle(color: Colors.white24),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          SizedBox(
+            width: double.infinity,
+            height: 56.h,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+              onPressed: () {
+                final text = inputController.textInputController.text;
+                if (text.isNotEmpty) {
+                  homeController.submitActionInput(text);
+                }
+              },
+              child: Text("Submit", style: TextStyle(color: Colors.black, fontSize: 16.sp, fontWeight: FontWeight.bold)),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultPanel() {
+    final homeController = Get.find<HomeController>();
+    return Padding(
+      padding: EdgeInsets.all(24.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(width: 60.w, height: 6.h, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)))),
+          SizedBox(height: 20.h),
+          Text(
+            "Agent Result", 
+            style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)
+          ),
+          SizedBox(height: 20.h),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: Colors.black26, 
+                borderRadius: BorderRadius.circular(16.r)
+              ),
+              child: SingleChildScrollView(
+                child: Text(
+                  homeController.lastResult.value,
+                  style: TextStyle(color: Colors.white, fontSize: 16.sp, height: 1.5),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 20.h),
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.copy,
+                  label: "Copy",
+                  color: Colors.white10,
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: homeController.lastResult.value));
+                    Get.snackbar(
+                      "Copied",
+                      "Result copied to clipboard",
+                      snackPosition: SnackPosition.BOTTOM,
+                      backgroundColor: AppTheme.accentColor,
+                      colorText: Colors.white,
+                    );
+                  },
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.share,
+                  label: "Share",
+                  color: Colors.white10,
+                  onTap: () {
+                    Share.share(homeController.lastResult.value);
+                  },
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          SizedBox(
+            width: double.infinity,
+            height: 56.h,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+              onPressed: () => Get.find<HomeInputController>().closePanel(),
+              child: Text("Done", style: TextStyle(color: Colors.black, fontSize: 16.sp, fontWeight: FontWeight.bold)),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({required IconData icon, required String label, required Color color, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Container(
+        height: 50.h,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 18.sp),
+            SizedBox(width: 8.w),
+            Text(label, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPanelButton(IconData icon, String label, Color color) {
     return Container(
       height: 60.h,
@@ -412,7 +608,7 @@ class HomeActivity extends StatelessWidget {
       borderRadius: BorderRadius.circular(24.r),
       child: Container(
         width: 100.w,
-        height: 110.h,
+        height: 90.h,
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(24.r),

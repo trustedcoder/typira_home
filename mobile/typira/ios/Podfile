@@ -49,6 +49,18 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      
+      # Enable Calendar Permission (handle both Array and String formats safely)
+      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
+      
+      # PERMISSION_EVENTS_FULL_ACCESS=1 is REQUIRED for iOS 17+ to show the dialog
+      ['PERMISSION_EVENTS=1', 'PERMISSION_REMINDERS=1', 'PERMISSION_EVENTS_FULL_ACCESS=1'].each do |permission|
+        if config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'].is_a? String
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] += " #{permission}"
+        else
+          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << permission
+        end
+      end
     end
   end
 end

@@ -4,8 +4,10 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
-  // static const String baseUrl = "http://192.168.1.114:7009/api";
-  static const String baseUrl = "http://192.168.0.181:7009/api";
+  // static const String baseUrl = "http://172.20.10.7:7009/api";
+  // static const String socketUrl = "http://172.20.10.7:7009";
+  static const String baseUrl = "http://192.168.1.186:7009/api";
+  static const String socketUrl = "http://192.168.1.186:7009";
   static const String login = "$baseUrl/auth/login";
   static const String register = "$baseUrl/auth/register";
   static const String getUser = "$baseUrl/user/me";

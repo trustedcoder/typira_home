@@ -1,26 +1,134 @@
-from flask import request, session
+from flask import request, session, current_app
 from flask_socketio import emit
 from app import socketio, db
-from app.models.context import TypingHistory
+from app.models.context import TypingHistory, Memory, UserAction
 from app.models.users import User
 # from app.helpers.auth_helpers import token_required_socket # We need a socket version of this
 import datetime
 import time
 
-@socketio.on('connect')
-def handle_connect(auth=None):
-    auth_token = request.headers.get('Authorization') or \
-                 request.headers.get('HTTP_AUTHORIZATION')
+def get_socket_user_id():
+    """Extract user_id from session or Authorization header."""
+    user_id = session.get('user_id')
+    if not user_id:
+        auth_token = request.headers.get('Authorization') or \
+                     request.headers.get('HTTP_AUTHORIZATION')
+        if auth_token:
+            if auth_token.startswith("Bearer "):
+                auth_token = auth_token[7:]
+            resp = User.decode_auth_token(auth_token)
+            if resp['status'] == 1:
+                user_id = resp['user_id']
+                session['user_id'] = user_id
+    return user_id
 
+@socketio.on('connect', namespace='/agent')
+def handle_agent_connect(auth=None):
+    auth_token = request.headers.get('Authorization')
     if auth_token:
         if auth_token.startswith("Bearer "):
             auth_token = auth_token[7:]
-            
         resp = User.decode_auth_token(auth_token)
         if resp['status'] == 1:
             session['user_id'] = resp['user_id']
+    emit('con_response', {'status': 'connected', 'authenticated': 'user_id' in session}, namespace='/agent')
 
-    emit('con_response', {'status': 'connected', 'authenticated': 'user_id' in session})
+@socketio.on('connect', namespace='/home')
+def handle_home_connect(auth=None):
+    auth_token = request.headers.get('Authorization')
+    if auth_token:
+        if auth_token.startswith("Bearer "):
+            auth_token = auth_token[7:]
+        resp = User.decode_auth_token(auth_token)
+        if resp['status'] == 1:
+            session['user_id'] = resp['user_id']
+    emit('con_response', {'status': 'connected'}, namespace='/home')
+
+@socketio.on('get_priority', namespace='/home')
+def handle_get_priority(data=None):
+    user_id = get_socket_user_id()
+    platform = data.get('platform') if data else None
+    if user_id:
+        find_priority(user_id, platform=platform)
+
+def find_priority(user_id, platform=None):
+    """Synchronous helper to find a priority task and emit it."""
+    from app.business.gemini_business import GeminiBusiness
+    
+    # 1. Fetch History & Memories (Personalization)
+    history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.date_updated.desc()).limit(30).all()
+    
+    # Exclude actions:
+    # - Approved actions are excluded forever.
+    # - Declined actions are excluded for 1 hour.
+    one_hour_ago = datetime.datetime.utcnow() - datetime.timedelta(hours=1)
+    
+    excluded_actions = UserAction.query.filter(
+        UserAction.user_id == user_id,
+        db.or_(
+            UserAction.decision == 'approved',
+            db.and_(
+                UserAction.decision == 'declined',
+                UserAction.timestamp >= one_hour_ago
+            )
+        )
+    ).all()
+    
+    handled_ids = [a.action_id for a in excluded_actions]
+    
+    memories = Memory.query.filter_by(user_id=user_id).order_by(Memory.timestamp.desc()).limit(20).all()
+    
+    # 2. Fetch Recent Action Context (for Gemini to avoid repetition)
+    recent_actions = UserAction.query.filter_by(user_id=user_id).order_by(UserAction.timestamp.desc()).limit(15).all()
+    action_history = [f"{a.decision.upper()}: {a.context or a.action_id} at {a.timestamp.strftime('%Y-%m-%d %H:%M:%S')}" for a in recent_actions]
+
+    history_list = [f"{h.content} (Logged on {h.date_updated.strftime('%Y-%m-%d %H:%M:%S')})" for h in history]
+    memory_list = [f"{m.content} (Logged on {m.timestamp.strftime('%Y-%m-%d %H:%M:%S')})" for m in memories]
+    
+    # Handle New User / No Context
+    if not history_list and not memory_list:
+        emit('priority_task', {
+            'thought': "I'm Typira, your new personal assistant. It seems we haven't talked yet! Use the voice, text, or camera below, or start typing with the Typira keyboard so I can start learning how to help you.",
+            'label': "Ready",
+            'action_id': "none",
+            'type': "none"
+        }, room=request.sid, namespace='/home')
+        return
+
+    # 3. Get Priority Task
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    task = GeminiBusiness.get_priority_task(history_list, memory_list, action_history, "mobile_home", current_time=current_time, user_platform=platform)
+
+    print(task)
+    
+    # Stream Thoughts
+    thoughts = task.get('thoughts', [])
+    for thought in thoughts:
+        emit('thought_update', {'text': thought}, room=request.sid, namespace='/home')
+        socketio.sleep(3) # Short pause for readability
+    
+    # 3. Emit Result
+    # We check if the primary action (the first one) has already been handled.
+    primary_action_id = task.get('actions', [{}])[0].get('id', 'none')
+    
+    if primary_action_id in handled_ids and primary_action_id != 'none':
+        emit('priority_task', {
+                "thoughts": ["I'm having a bit of trouble connecting to my brain..."],
+                "title": "Standing by",
+                "plan": "I'm standing by to assist with your tasks.",
+                "actions": [
+                    {
+                        "id": "none",
+                        "label": "Ready",
+                        "type": "none",
+                        "payload": ""
+                    }
+                ]
+            }, room=request.sid, namespace='/home')
+    else:
+        # User 'plan' as the final presented thought for approval
+        task['thought'] = task.get('plan', '')
+        emit('priority_task', task, room=request.sid, namespace='/home')
 
 def async_persist_context(app, user_id, text, app_context, is_full):
     """
@@ -59,6 +167,7 @@ def async_persist_context(app, user_id, text, app_context, is_full):
                     last_entry.content = clean_text
                     last_entry.semantic_hash = s_hash
                     last_entry.timestamp = datetime.datetime.utcnow()
+                    last_entry.date_updated = datetime.datetime.utcnow()
                     db.session.commit()
                     continue
 
@@ -74,6 +183,7 @@ def async_persist_context(app, user_id, text, app_context, is_full):
                 if existing:
                     existing.frequency += 1
                     existing.timestamp = datetime.datetime.utcnow()
+                    existing.date_updated = datetime.datetime.utcnow()
                     existing.content = clean_text 
                 else:
                     new_entry = TypingHistory(
@@ -81,28 +191,16 @@ def async_persist_context(app, user_id, text, app_context, is_full):
                         content=clean_text,
                         semantic_hash=s_hash,
                         app_context=app_context,
-                        timestamp=datetime.datetime.utcnow()
+                        timestamp=datetime.datetime.utcnow(),
+                        date_updated=datetime.datetime.utcnow()
                     )
                     db.session.add(new_entry)
                 
                 db.session.commit()
 
-@socketio.on('analyze')
+@socketio.on('analyze', namespace='/agent')
 def handle_analyze(data):
-    # Priority: Session > Headers > Data Token
-    user_id = session.get('user_id')
-    
-    if not user_id:
-        auth_token = request.headers.get('Authorization') or \
-                     request.headers.get('HTTP_AUTHORIZATION')
-        if auth_token:
-            if auth_token.startswith("Bearer "):
-                auth_token = auth_token[7:]
-            resp = User.decode_auth_token(auth_token)
-            if resp['status'] == 1:
-                user_id = resp['user_id']
-                session['user_id'] = user_id 
-    
+    user_id = get_socket_user_id()
     if not user_id:
         return
     
@@ -121,15 +219,15 @@ def handle_analyze(data):
     from app.business.gemini_business import GeminiBusiness
     
     # 1. Gather Personal Context from TypingHistory
-    # Get top 30 most frequent intents
-    frequent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.frequency.desc()).limit(30).all()
-    # Get last 20 recent sentences
-    recent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.timestamp.desc()).limit(20).all()
+    # Get top 30 most recent items or frequent (ordered by update time for relevance)
+    recent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.date_updated.desc()).limit(30).all()
     
-    combined_history = list(set([h.content for h in frequent_history] + [h.content for h in recent_history]))
+    combined_history = [f"{h.content} (Logged on {h.date_updated.strftime('%Y-%m-%d %H:%M:%S')})" for h in recent_history]
     
     # 2. Call the Agentic Brain
-    analysis = GeminiBusiness.analyze_context(text, combined_history, app_context)
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    platform = data.get('platform')
+    analysis = GeminiBusiness.analyze_context(text, combined_history, app_context, current_time=current_time, user_platform=platform)
     
     # 3. Stream 'Thought Process' to UI
     thoughts = analysis.get('thoughts', [])
@@ -144,24 +242,66 @@ def handle_analyze(data):
         'actions': analysis.get('actions', [])
     })
     
-@socketio.on('perform_action')
+@socketio.on('approve_action', namespace='/home')
+def handle_approve_action(data):
+    """
+    Handles user approval of an agent-proposed priority task.
+    Specifically for the Home Screen loop.
+    """
+    user_id = get_socket_user_id()
+    if not user_id: return
+    
+    from app.business.gemini_business import GeminiBusiness
+    action_id = data.get('action_id')
+    payload = data.get('payload')
+    user_input = data.get('user_input')
+    platform = data.get('platform')
+    
+    emit('thought_update', {'text': "Starting..."}, namespace='/home')
+    
+    # 1. Fetch History for personalization
+    history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.date_updated.desc()).limit(30).all()
+    memories = Memory.query.filter_by(user_id=user_id).order_by(Memory.timestamp.desc()).limit(10).all()
+    combined_history = [f"{h.content} (Logged on {h.date_updated.strftime('%Y-%m-%d %H:%M:%S')})" for h in history] + \
+                       [f"{m.content} (Logged on {m.timestamp.strftime('%Y-%m-%d %H:%M:%S')})" for m in memories]
+    
+    # 2. Record approval for the priority loop memory
+    new_action = UserAction(user_id=user_id, action_id=action_id, decision='approved', context=str(payload))
+    db.session.add(new_action)
+    db.session.commit()
+    
+    # 3. Call the Agentic Brain for specialized execution
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execution = GeminiBusiness.perform_agentic_action(action_id, payload, combined_history, user_input=user_input, current_time=current_time, user_platform=platform)
+
+    print(execution)
+    
+    # 4. Stream 'Thought Process' to UI
+    thoughts = execution.get('thoughts', [])
+    for thought in thoughts:
+        emit('thought_update', {'text': thought}, namespace='/home')
+        socketio.sleep(3) # Short pause for readability
+
+    # 5. Save to Memory for future reference
+    if execution.get('result'):
+        new_memory = Memory(user_id=user_id, content=execution['result'], source_type='agent_action', tags=action_id)
+        db.session.add(new_memory)
+        db.session.commit()
+
+    # 6. Return result specifically for the Mobile App
+    emit('action_result', {
+        'thought': thoughts[-1] if thoughts else 'Task complete.',
+        'result': execution.get('result', ''),
+        'action_id': action_id
+    }, namespace='/home')
+
+@socketio.on('perform_action', namespace='/agent')
 def handle_perform_action(data):
     """
-    Handles iterative agentic loops (Step 2 of an action).
-    Expected data: {'action_id': '...', 'payload': '...', 'context': '...'}
+    Handles keyboard-triggered proactive actions.
+    Maintains original behavior without recording UserAction decisions.
     """
-    user_id = session.get('user_id')
-    if not user_id:
-        # Attempt fallback from headers
-        auth_token = request.headers.get('Authorization')
-        if auth_token:
-            if auth_token.startswith("Bearer "):
-                auth_token = auth_token[7:]
-            resp = User.decode_auth_token(auth_token)
-            if resp['status'] == 1:
-                user_id = resp['user_id']
-                session['user_id'] = user_id
-                
+    user_id = get_socket_user_id()
     if not user_id:
         return
     
@@ -170,20 +310,42 @@ def handle_perform_action(data):
     payload = data.get('payload')
     context = data.get('context', '')
     
-    emit('thought_update', {'text': f"Executing {action_id}..."})
+    emit('thought_update', {'text': f"Processing..."})
     
-    # Fetch History for personalization
-    frequent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.frequency.desc()).limit(30).all()
-    recent_history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.timestamp.desc()).limit(20).all()
-    combined_history = list(set([h.content for h in frequent_history] + [h.content for h in recent_history]))
+    history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.date_updated.desc()).limit(30).all()
+    memories = Memory.query.filter_by(user_id=user_id).order_by(Memory.timestamp.desc()).limit(10).all()
+    combined_history = [f"{h.content} (Logged on {h.date_updated.strftime('%Y-%m-%d %H:%M:%S')})" for h in history] + \
+                       [f"{m.content} (Logged on {m.timestamp.strftime('%Y-%m-%d %H:%M:%S')})" for m in memories]
     
-    # Call the Agentic Brain for specialized execution
-    execution = GeminiBusiness.perform_agentic_action(action_id, payload, context, combined_history)
+    # Execute action WITHOUT recording a UserAction (keep it separate from priority deduplication)
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    execution = GeminiBusiness.perform_keyboard_agentic_action(action_id, payload, context, combined_history, current_time=current_time)
     
-    # Return result
-    emit('thought_update', {'text': execution.get('thought', 'Task complete.')})
+    # Still return result for UI feedback
     emit('suggestion_ready', {
         'thought': execution.get('thought', ''),
         'result': execution.get('result', ''),
-        'actions': [] # Usually clear actions after execution
+        'actions': [] 
     })
+
+@socketio.on('decline_action', namespace='/home')
+def handle_decline_action(data):
+    """
+    Handles user declining a priority task.
+    Records in UserAction and Memory.
+    """
+    user_id = get_socket_user_id()
+    if not user_id: return
+    
+    from app.models.context import Memory
+    action_id = data.get('action_id')
+    
+    # 1. Record decision in UserAction
+    payload = data.get('payload')
+    new_action = UserAction(user_id=user_id, action_id=action_id, decision='declined', context=str(payload) if payload else None)
+    db.session.add(new_action)
+    
+    db.session.commit()
+    
+    # 3. We NO LONGER call find_priority here. 
+    # The frontend will wait 5 seconds and call 'get_priority' manually.

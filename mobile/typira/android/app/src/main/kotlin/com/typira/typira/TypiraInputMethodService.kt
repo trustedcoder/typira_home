@@ -301,17 +301,18 @@ class TypiraInputMethodService : InputMethodService() {
 
     private fun onAgentActionClick(actionId: String) {
         // Smart Action Lookup
-        val smartAction = (0 until currentSmartActions.size).map { currentSmartActions[it] }
-            .find { it.getString("id") == actionId }
-            
+        val smartAction = currentSmartActions.find { 
+            try { it.getString("id") == actionId } catch (e: Exception) { false } 
+        }
+
         if (smartAction != null) {
             val type = smartAction.optString("type", "")
-            val payload = smartAction.optString("payload", "")
             val label = smartAction.optString("label", actionId)
             
             android.util.Log.d("Typira", "Tapped Smart Action: $actionId Type: $type")
             
             if (type == "deep_link") {
+                val payload = smartAction.optString("payload", "")
                 try {
                     val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(payload))
                     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -320,12 +321,19 @@ class TypiraInputMethodService : InputMethodService() {
                 } catch (e: Exception) {
                     Toast.makeText(this, "Could not open: $label", Toast.LENGTH_SHORT).show()
                 }
+            } else if (type == "calendar_event") {
+                 val payloadObj = smartAction.optJSONObject("payload")
+                 if (payloadObj != null) {
+                     handleNativeCalendarEvent(payloadObj)
+                 }
             } else if (type == "prompt_trigger") {
+                // Ensure payload is a string here, or handle as JsonObject convert to string if needed
+                val payloadStr = smartAction.optString("payload", "") 
                 val inputConnection = currentInputConnection
                 val extractedText = inputConnection?.getExtractedText(ExtractedTextRequest(), 0)
                 val fullContext = extractedText?.text?.toString() ?: ""
                 
-                historyManager.performAction(actionId, type, payload, fullContext)
+                historyManager.performAction(actionId, type, payloadStr, fullContext)
                 tvSuggestion.text = "Typira is working on: $label..."
             }
             return
@@ -339,6 +347,58 @@ class TypiraInputMethodService : InputMethodService() {
                 requestNativeRewrite(currentText)
             }
             showKeyboardState(KeyboardState.MAIN)
+        }
+    }
+
+    private fun handleNativeCalendarEvent(payload: JSONObject) {
+        try {
+            val title = payload.optString("title", "Reminder")
+            val description = payload.optString("description", "")
+            val startStr = payload.optString("start", "")
+            val endStr = payload.optString("end", "")
+
+            val startTime = if (startStr.isNotEmpty()) {
+                java.time.ZonedDateTime.parse(startStr).toInstant().toEpochMilli()
+            } else {
+                System.currentTimeMillis()
+            }
+
+            val endTime = if (endStr.isNotEmpty()) {
+                java.time.ZonedDateTime.parse(endStr).toInstant().toEpochMilli()
+            } else {
+                startTime + 3600000 // +1 hour
+            }
+
+            val intent = android.content.Intent(android.content.Intent.ACTION_INSERT).apply {
+                data = android.provider.CalendarContract.Events.CONTENT_URI
+                putExtra(android.provider.CalendarContract.Events.TITLE, title)
+                putExtra(android.provider.CalendarContract.Events.DESCRIPTION, description)
+                putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, startTime)
+                putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, endTime)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            
+            try {
+                startActivity(intent)
+                tvSuggestion.text = "Setting up event: $title"
+            } catch (e: Exception) {
+                // If no app can handle ACTION_INSERT (rare, but happens if no calendar app installed)
+                 Toast.makeText(this, "No Calendar app found. Please install one.", Toast.LENGTH_LONG).show()
+                 
+                 // Try to open generic calendar view
+                 try {
+                     val calIntent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                         data = android.net.Uri.parse("content://com.android.calendar/time/")
+                         addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                     }
+                     startActivity(calIntent)
+                 } catch (e2: Exception) {
+                     // Fallback failed too
+                 }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("Typira", "Calendar Intent Error: ${e.message}")
+            Toast.makeText(this, "Could not open calendar", Toast.LENGTH_SHORT).show()
         }
     }
 

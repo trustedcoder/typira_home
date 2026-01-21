@@ -1,5 +1,6 @@
 import UIKit
 import Foundation
+import EventKit
 
 extension KeyboardViewController {
     
@@ -76,17 +77,22 @@ extension KeyboardViewController {
         // Lookup Smart Metadata
         if let metadata = currentSmartActions.first(where: { ($0["id"] as? String) == actionId }) {
             let type = metadata["type"] as? String ?? ""
-            let payload = metadata["payload"] as? String ?? ""
+            let rawPayload = metadata["payload"]
             
             NSLog("DEBUG: [Action] Tapped Smart Chip: \(actionId) Type: \(type)")
             
             if type == "deep_link" {
-                if let url = URL(string: payload) {
+                if let payload = rawPayload as? String, let url = URL(string: payload) {
                     openApp(url: url)
                     self.suggestionLabel?.text = "Opening \(actionId)..."
                 }
+            } else if type == "calendar_event" {
+                if let payload = rawPayload as? [String: Any] {
+                    handleNativeCalendarEvent(payload: payload, label: title)
+                }
             } else if type == "prompt_trigger" {
                 // Iterative AI Loop
+                let payload = rawPayload as? String ?? ""
                 let before = textDocumentProxy.documentContextBeforeInput ?? ""
                 let after = textDocumentProxy.documentContextAfterInput ?? ""
                 let fullContext = before + after
@@ -97,7 +103,8 @@ extension KeyboardViewController {
                 self.suggestionLabel?.text = "Typira is working on: \(title)..."
             }
             return
-        } else {
+        }
+ else {
             NSLog("DEBUG: [Action] Metadata lookup FAILED for actionId: '\(actionId)'. Current actions: \(currentSmartActions.count)")
         }
         
@@ -147,12 +154,74 @@ extension KeyboardViewController {
                             NSLog("DEBUG: [Action] Triggered openURL: on responder chain")
                             return
                         }
-                        responder = responder?.next
+                        responder = responder!.next
                     }
                     NSLog("DEBUG: [Action] CRITICAL: No responder found for openURL:")
                 }
             }
         })
+    }
+    
+    private func handleNativeCalendarEvent(payload: [String: Any], label: String) {
+        let eventStore = EKEventStore()
+        
+        func createEvent() {
+            let event = EKEvent(eventStore: eventStore)
+            event.title = payload["title"] as? String ?? "Reminder"
+            event.notes = payload["description"] as? String ?? ""
+            
+            let dateFormatter = ISO8601DateFormatter()
+            if let startStr = payload["start"] as? String, let startDate = dateFormatter.date(from: startStr) {
+                event.startDate = startDate
+            } else {
+                event.startDate = Date()
+            }
+            
+            if let endStr = payload["end"] as? String, let endDate = dateFormatter.date(from: endStr) {
+                event.endDate = endDate
+            } else {
+                event.endDate = event.startDate.addingTimeInterval(3600) // 1 hour default
+            }
+            
+            event.calendar = eventStore.defaultCalendarForNewEvents
+            
+            do {
+                try eventStore.save(event, span: .thisEvent)
+                DispatchQueue.main.async {
+                    self.suggestionLabel?.text = "✅ Event Created: \(event.title!)"
+                }
+            } catch {
+                NSLog("ERROR: [Calendar] Could not save event: \(error)")
+                DispatchQueue.main.async {
+                    self.suggestionLabel?.text = "❌ Failed to create event"
+                }
+            }
+        }
+
+        // Handle permissions
+        if #available(iOS 17.0, *) {
+            eventStore.requestFullAccessToEvents { granted, error in
+                if granted {
+                    createEvent()
+                } else {
+                    NSLog("ERROR: [Calendar] Full access denied: \(error?.localizedDescription ?? "unknown")")
+                    DispatchQueue.main.async {
+                        self.suggestionLabel?.text = "⚠️ Calendar permission required"
+                    }
+                }
+            }
+        } else {
+            eventStore.requestAccess(to: .event) { granted, error in
+                if granted {
+                    createEvent()
+                } else {
+                    NSLog("ERROR: [Calendar] Access denied: \(error?.localizedDescription ?? "unknown")")
+                    DispatchQueue.main.async {
+                        self.suggestionLabel?.text = "⚠️ Calendar permission required"
+                    }
+                }
+            }
+        }
     }
     
     @objc func didTapSuggestionLabel(_ gesture: UITapGestureRecognizer) {

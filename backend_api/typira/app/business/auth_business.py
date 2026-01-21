@@ -40,6 +40,7 @@ class AuthBusiness:
                     response_object = {
                         'status': 1,
                         'public_id': user.public_id,
+                        'name': user.name,
                         'message': 'Successfully logged in.',
                         'authorization': auth_response['token']
                     }

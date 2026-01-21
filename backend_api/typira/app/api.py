@@ -3,6 +3,7 @@ from flask_restx import Api
 import os
 from .endpoints.auth_endpoints import ns as auth_namespace
 from .endpoints.ai import ns as ai_namespace
+from .endpoints.user_endpoints import ns as user_namespace
 
 # version 1
 blueprint = Blueprint("api", __name__, url_prefix="/api")
@@ -27,3 +28,4 @@ api = Api(
 )
 api.add_namespace(auth_namespace)
 api.add_namespace(ai_namespace)
+api.add_namespace(user_namespace)

@@ -40,7 +40,7 @@ class TypingHistoryManager {
         }
         
         manager = SocketManager(socketURL: URL(string: "http://localhost:7009")!, config: config)
-        socket = manager?.defaultSocket
+        socket = manager?.socket(forNamespace: "/agent")
         
         socket?.on(clientEvent: .connect) { [weak self] data, ack in
         }
