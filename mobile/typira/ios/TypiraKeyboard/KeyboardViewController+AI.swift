@@ -110,7 +110,7 @@ extension KeyboardViewController {
         
         // Legacy/Fixed Action Strip Buttons
         if actionId == "rewrite" || title == "✨ Rewrite" {
-            if let url = URL(string: "typira://app") {
+            if let url = URL(string: "typira://home") {
                 openApp(url: url)
             }
         } else if actionId == "paste" || title == "🧠 Paste" {
@@ -128,7 +128,7 @@ extension KeyboardViewController {
         } else if actionId == "mic" || title == "🎙️" {
             handleMicAction()
         } else if actionId == "hub" {
-            if let url = URL(string: "typira://app") {
+            if let url = URL(string: "typira://home") {
                 openApp(url: url)
             }
         }

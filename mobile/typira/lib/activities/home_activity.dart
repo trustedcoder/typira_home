@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../constants/app_theme.dart';
 import '../controllers/home.dart';
@@ -36,6 +37,7 @@ class HomeActivity extends StatelessWidget {
         backdropEnabled: true,
         backdropColor: Colors.black,
         backdropOpacity: 0.8,
+        onPanelClosed: () => Get.find<HomeInputController>().closePanel(),
         panel: Obx(() => _buildPanelContent(context)),
         body: Obx(() => IndexedStack(
           index: controller.tabIndex.value,
@@ -342,6 +344,7 @@ class HomeActivity extends StatelessWidget {
   }
 
   Widget _buildCameraPanel() {
+    final inputController = Get.find<HomeInputController>();
     return Padding(
       padding: EdgeInsets.all(24.w),
       child: Column(
@@ -359,9 +362,9 @@ class HomeActivity extends StatelessWidget {
           SizedBox(height: 40.h),
           Row(
             children: [
-              Expanded(child: _buildPanelButton(Icons.photo_library, "Gallery", Colors.white10)),
+              Expanded(child: _buildPanelButton(Icons.photo_library, "Gallery", Colors.white10, () => inputController.pickImage(ImageSource.gallery))),
               SizedBox(width: 20.w),
-              Expanded(child: _buildPanelButton(Icons.camera, "Camera", AppTheme.primaryColor)),
+              Expanded(child: _buildPanelButton(Icons.camera, "Camera", AppTheme.primaryColor, () => inputController.pickImage(ImageSource.camera))),
             ],
           )
         ],
@@ -370,18 +373,88 @@ class HomeActivity extends StatelessWidget {
   }
 
   Widget _buildMicPanel() {
+    final inputController = Get.find<HomeInputController>();
     return Padding(
       padding: EdgeInsets.all(24.w),
-      child: Column(
-        children: [
-          Container(width: 60.w, height: 6.h, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
-          Spacer(),
-          Icon(Icons.mic, size: 80.sp, color: Color(0xFFD500F9)),
-          SizedBox(height: 40.h),
-          Text("Listening...", style: TextStyle(color: Colors.white, fontSize: 24.sp, fontWeight: FontWeight.bold)),
-          Spacer(),
-        ],
-      ),
+      child: Obx(() {
+        final isRecording = inputController.isRecording.value;
+        final isPaused = inputController.isPaused.value;
+
+        return Column(
+          children: [
+            Container(width: 60.w, height: 6.h, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
+            SizedBox(height: 40.h),
+            
+            // Pulse Animation / Icon
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 1.0, end: isRecording && !isPaused ? 1.2 : 1.0),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOutBack,
+              onEnd: () {
+                // This doesn't infinite loop easily in TweenAnimationBuilder without extra logic,
+                // but for a simple indicator it works well enough or we can use a more static approach.
+              },
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: Container(
+                    padding: EdgeInsets.all(20.w),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isRecording && !isPaused ? Color(0xFFD500F9).withOpacity(0.2) : Colors.transparent,
+                    ),
+                    child: Icon(
+                      isPaused ? Icons.pause_circle : Icons.mic,
+                      size: 80.sp,
+                      color: Color(0xFFD500F9),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            SizedBox(height: 30.h),
+            Text(
+              isPaused ? "Recording Paused" : "Listening...",
+              style: TextStyle(color: Colors.white, fontSize: 24.sp, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 10.h),
+            Text(
+              "Speak clearly for the best analysis.",
+              style: TextStyle(color: Colors.white54, fontSize: 16.sp),
+            ),
+            
+            Spacer(),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _buildPanelButton(
+                    isPaused ? Icons.play_arrow : Icons.pause,
+                    isPaused ? "Resume" : "Pause",
+                    Colors.white10,
+                    () => isPaused ? inputController.resumeRecording() : inputController.pauseRecording(),
+                  ),
+                ),
+                SizedBox(width: 20.w),
+                Expanded(
+                  child: _buildPanelButton(
+                    Icons.send,
+                    "Send",
+                    AppTheme.primaryColor,
+                    () => inputController.stopAndSend(),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 20.h),
+            TextButton(
+              onPressed: () => inputController.closePanel(),
+              child: Text("Cancel", style: TextStyle(color: Colors.white54, fontSize: 16.sp)),
+            ),
+          ],
+        );
+      }),
     );
   }
   
@@ -423,7 +496,7 @@ class HomeActivity extends StatelessWidget {
             height: 56.h,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accentColor),
-              onPressed: () => controller.closePanel(), // Mock send
+              onPressed: () => controller.submitText(),
               child: Text("Send to Agent", style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.bold)),
             ),
           )
@@ -587,17 +660,21 @@ class HomeActivity extends StatelessWidget {
     );
   }
 
-  Widget _buildPanelButton(IconData icon, String label, Color color) {
-    return Container(
-      height: 60.h,
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16.r)),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Colors.white),
-          SizedBox(width: 10.w),
-          Text(label, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ],
+  Widget _buildPanelButton(IconData icon, String label, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Container(
+        height: 60.h,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16.r)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white),
+            SizedBox(width: 10.w),
+            Text(label, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }

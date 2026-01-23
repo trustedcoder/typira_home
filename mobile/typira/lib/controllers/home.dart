@@ -8,6 +8,9 @@ import '../services/socket_service.dart';
 import '../api/user_api.dart';
 import '../controllers/home_input.dart';
 import '../services/calendar_service.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:mime/mime.dart';
 
 class HomeController extends GetxController {
   
@@ -44,6 +47,10 @@ class HomeController extends GetxController {
   String _lastActionId = "";
   dynamic _lastActionPayload = "";
   String? _lastUserInput;
+  bool _isImageAnalysisActive = false;
+  bool _isVoiceAnalysisActive = false;
+  bool _isTextAnalysisActive = false;
+  Timer? _priorityTimer;
 
   @override
   void onInit() {
@@ -75,7 +82,20 @@ class HomeController extends GetxController {
         dialogueBody.value = "Hello! I'm ready to assist you.";
         currentThought.value = "Checking in...";
         // Request initial priority task once ready
+
         socketService.getPriority();
+        
+        _priorityTimer?.cancel();
+        _priorityTimer = Timer(const Duration(seconds: 3), () {
+          if (!isClosed && !_isImageAnalysisActive && !_isVoiceAnalysisActive && !_isTextAnalysisActive) {
+            agentState.value = 2; // Working
+            isThinking.value = true;
+            dialogueTitle.value = "Working...";
+            dialogueBody.value = "Am going through your data.";
+            currentThought.value = "Am going through your data...";
+            update();
+          }
+        });
       } else {
         dialogueTitle.value = "System Offline";
         dialogueBody.value = "Check your connection.";
@@ -85,6 +105,7 @@ class HomeController extends GetxController {
     };
 
     socketService.onPriorityTask = (task) {
+      _priorityTimer?.cancel();
       agentState.value = 1; // Proposing
       isThinking.value = false;
       dialogueTitle.value = task['title'] ?? "Priority Detected";
@@ -101,6 +122,7 @@ class HomeController extends GetxController {
     };
 
     socketService.onThoughtUpdate = (thought) {
+      _priorityTimer?.cancel();
       agentState.value = 2; // Working
       isThinking.value = true;
       currentThought.value = thought;
@@ -137,8 +159,9 @@ class HomeController extends GetxController {
         showResultPanel(data['action_id'], result);
 
         // Wait 5 seconds for user to read result, then fetch next task
-        Future.delayed(const Duration(seconds: 5), () {
-          if (!isClosed) {
+        _priorityTimer?.cancel();
+        _priorityTimer = Timer(const Duration(seconds: 5), () {
+          if (!isClosed && !_isImageAnalysisActive && !_isVoiceAnalysisActive && !_isTextAnalysisActive) {
             agentState.value = 2; // Working
             isThinking.value = true;
             dialogueTitle.value = "Working...";
@@ -300,6 +323,29 @@ class HomeController extends GetxController {
     
     _pendingActionId = "";
     _pendingPayload = "";
+    _isImageAnalysisActive = false;
+    _isVoiceAnalysisActive = false;
+    _isTextAnalysisActive = false;
+  }
+
+  void clearAnalysisAndResume() {
+    _isImageAnalysisActive = false;
+    _isVoiceAnalysisActive = false;
+    _isTextAnalysisActive = false;
+    
+    // Restart priority timer immediately
+    _priorityTimer?.cancel();
+    _priorityTimer = Timer(const Duration(seconds: 1), () {
+      if (!isClosed && !_isImageAnalysisActive && !_isVoiceAnalysisActive && !_isTextAnalysisActive && agentState.value == 0) {
+        agentState.value = 2; // Working
+        isThinking.value = true;
+        dialogueTitle.value = "Working...";
+        dialogueBody.value = "Preparing next task.";
+        currentThought.value = "Checking for new priorities...";
+        update();
+        socketService.getPriority();
+      }
+    });
   }
 
   void executeAction(String actionId, dynamic payload, {String? userInput, bool isSilent = false}) {
@@ -309,7 +355,7 @@ class HomeController extends GetxController {
       currentThought.value = "On it...";
     }
     
-    // Store context for retry
+    // Store context for retry 
     _lastActionId = actionId;
     _lastActionPayload = payload;
     _lastUserInput = userInput;
@@ -318,6 +364,18 @@ class HomeController extends GetxController {
   }
 
   void declineTaskWithId(String actionId, {dynamic payload}) {
+    if (actionId == "none") {
+      // Just clear and refresh immediately
+      agentState.value = 2; // Working
+      isThinking.value = true;
+      dialogueTitle.value = "Working...";
+      dialogueBody.value = "Checking for updates...";
+      currentThought.value = "Looking for relevant tasks...";
+      update();
+      socketService.getPriority();
+      return;
+    }
+
     agentState.value = 0; // Show Idle state but with custom message
     isThinking.value = false;
     
@@ -328,8 +386,9 @@ class HomeController extends GetxController {
     socketService.declineAction(actionId, payload: payload);
 
     // Wait 5 seconds before calling the next priority task
-    Future.delayed(const Duration(seconds: 5), () {
-      if (!isClosed) {
+    _priorityTimer?.cancel();
+    _priorityTimer = Timer(const Duration(seconds: 3), () {
+      if (!isClosed && !_isImageAnalysisActive && !_isVoiceAnalysisActive && !_isTextAnalysisActive) {
         agentState.value = 2; // Working
         isThinking.value = true;
         dialogueTitle.value = "Working...";
@@ -361,6 +420,80 @@ class HomeController extends GetxController {
     final inputController = Get.find<HomeInputController>();
     inputController.activeChannel.value = InputChannel.result;
     inputController.panelController.open();
+  }
+
+  Future<void> processImage(File image) async {
+    _isImageAnalysisActive = true;
+    _priorityTimer?.cancel(); // Stop any pending priority task fetch
+
+    agentState.value = 2; // Working/Thinking
+    isThinking.value = true;
+    dialogueTitle.value = "Analyzing Image";
+    currentThought.value = "Scanning visual content...";
+    update();
+
+    try {
+      final bytes = await image.readAsBytes();
+      final base64Image = base64Encode(bytes);
+      final mimeType = lookupMimeType(image.path) ?? 'image/jpeg';
+
+      socketService.analyzeImage(base64Image, mimeType);
+    } catch (e) {
+      print("Image Process Error: $e");
+      _isImageAnalysisActive = false;
+      agentState.value = 0;
+      dialogueTitle.value = "Analysis Failed";
+      dialogueBody.value = "I couldn't process that image. Please try again.";
+      update();
+    }
+  }
+
+  Future<void> processVoice(File audio) async {
+    _isVoiceAnalysisActive = true;
+    _priorityTimer?.cancel();
+
+    agentState.value = 2; // Working/Thinking
+    isThinking.value = true;
+    dialogueTitle.value = "Analyzing Voice";
+    currentThought.value = "Transcribing audio content...";
+    update();
+
+    try {
+      final bytes = await audio.readAsBytes();
+      final base64Audio = base64Encode(bytes);
+      final mimeType = lookupMimeType(audio.path) ?? 'audio/m4a';
+
+      socketService.analyzeVoice(base64Audio, mimeType);
+    } catch (e) {
+      print("Voice Process Error: $e");
+      _isVoiceAnalysisActive = false;
+      agentState.value = 0;
+      dialogueTitle.value = "Analysis Failed";
+      dialogueBody.value = "I couldn't process your voice. Please try again.";
+      update();
+    }
+  }
+
+  Future<void> processText(String text) async {
+    _isTextAnalysisActive = true;
+    _priorityTimer?.cancel();
+
+    agentState.value = 2; // Working/Thinking
+    isThinking.value = true;
+    dialogueTitle.value = "Analyzing Input";
+    currentThought.value = "Processing your message...";
+    update();
+
+    try {
+      socketService.analyzeText(text);
+    } catch (e) {
+      print("Text Process Error: $e");
+      _isTextAnalysisActive = false;
+      agentState.value = 0;
+      dialogueTitle.value = "Analysis Failed";
+      dialogueBody.value = "I couldn't process your message. Please try again.";
+      update();
+    }
   }
 
   @override

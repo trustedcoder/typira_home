@@ -113,6 +113,29 @@ class SocketService {
     });
   }
 
+  void analyzeImage(String base64Image, String mimeType) {
+    socket?.emit('analyze_image', {
+      'image': base64Image,
+      'mime_type': mimeType,
+      'platform': Platform.isIOS ? 'ios' : 'android'
+    });
+  }
+
+  void analyzeVoice(String base64Audio, String mimeType) {
+    socket?.emit('analyze_voice', {
+      'audio': base64Audio,
+      'mime_type': mimeType,
+      'platform': Platform.isIOS ? 'ios' : 'android'
+    });
+  }
+
+  void analyzeText(String text) {
+    socket?.emit('analyze_text', {
+      'text': text,
+      'platform': Platform.isIOS ? 'ios' : 'android'
+    });
+  }
+
   void disconnect() {
     socket?.disconnect();
   }

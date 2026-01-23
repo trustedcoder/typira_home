@@ -1,6 +1,7 @@
 import json
 import os
 import traceback
+import base64
 from google import genai
 from google.genai import types
 
@@ -371,7 +372,12 @@ OUTPUT FORMAT:
             return json.loads(response.text)
         except Exception as e:
             print(f"Action Execution Error: {e}")
-            return {"thought": "Error executing action.", "result": ""}
+            return {
+                "thoughts": ["I encountered an error while executing the action."],
+                "title": "Failed to execute action.",
+                "plan": "I'm having trouble executing the action.",
+                "actions": [{"id": "none", "label": "Ok", "type": "none", "payload": ""}]
+            }
 
     @staticmethod
     def perform_agentic_action(action_id: str, payload: str, history: list, user_input: str = None, current_time: str = None, user_platform: str = None):
@@ -434,4 +440,318 @@ Return ONLY the JSON object."""
             return json.loads(response.text)
         except Exception as e:
             print(f"Action Execution Error: {e}")
-            return {"thoughts": ["Error executing action."], "result": ""}
+            return {
+                "thoughts": ["I encountered an error while executing the action."],
+                "title": "Failed to execute action.",
+                "plan": "I'm having trouble executing the action.",
+                "actions": [{"id": "none", "label": "Ok", "type": "none", "payload": ""}]
+            }
+
+    @staticmethod
+    def analyze_image(image_base64: str, mime_type: str, history: list, memories: list, action_history: list, current_time: str = None, user_platform: str = None):
+        """
+        Analyzes an image using Gemini Vision and context.
+        """
+        try:
+            history_block = "\n".join([f"- {h}" for h in history])
+            memory_block = "\n".join([f"- {m}" for m in memories])
+            action_block = "\n".join([f"- {a}" for a in action_history])
+            time_context = f"CURRENT TIME: {current_time}\n" if current_time else ""
+
+            # Prepare Image Part
+            image_data = base64.b64decode(image_base64)
+            image_part = types.Part.from_bytes(data=image_data, mime_type=mime_type)
+
+            prompt = f"""You are Typira, my personal assistant. I have just shared an image with you. 
+{time_context}Your goal is to analyze the image, get its text representation, and combine it with my history, memory, and recent actions to provide an insightful context.
+
+MY TYPING HISTORY:
+{history_block}
+
+MY PERSISTENT MEMORIES:
+{memory_block}
+
+MY RECENT ACTIONS:
+{action_block}
+
+USER PLATFORM: {user_platform or "unknown"}
+
+INSTRUCTIONS:
+1. Describe the image in detail (internally for your analysis).
+2. Cross-reference the visual content with my history and memories to find deeper relevance.
+3. Formulate a multi-step 'Thought Process':
+   - Analyze the visual elements.
+   - Connect them to my personality, history, or current needs.
+   - VERIFY the insight is truly useful and not just a generic description.
+   - Propose proactive actions.
+4. Return a 'title' for this insight (short, 3-4 words).
+5. Return a 'plan' (the actual insightful context you present to me). 
+6. Return a list of 'actions' (buttons) I can take. 
+   - Mandatory: At least one 'prompt_trigger' action to "Save to memory" (payload should be a summary of the image analysis).
+   - Optional: Other useful actions based on the image (e.g., "Draft email", "Search for this", "Set reminder").
+   - Mandatory: One 'none' action to dismiss.
+
+OUTPUT FORMAT (Strict JSON):
+{{
+  "thoughts": [
+      "I see a picture of a receipt...", 
+      "Connecting this to your message about 'expense tracking' yesterday...", 
+      "VERIFICATION: Proposing a way to categorize this expense accurately.",
+      "Finalizing the insight."
+  ],
+  "title": "Expense Detected",
+  "plan": "I've analyzed the photo. This seems to be the receipt for the dinner you mentioned earlier. Would you like me to log this under 'Business Travel'?",
+  "actions": [
+     {{
+       "id": "save_to_memory",
+       "label": "💾 Save to Memory",
+       "type": "prompt_trigger",
+       "payload": "Please remember this: [Text representation/summary of the image analysis]"
+     }},
+     {{
+       "id": "draft_expense",
+       "label": "✍️ Draft Expense Note",
+       "type": "prompt_trigger",
+       "payload": "Draft a short expense note for this receipt."
+     }},
+     {{
+       "id": "none",
+       "label": "❌ Dismiss",
+       "type": "none",
+       "payload": ""
+     }}
+  ]
+}}
+
+- Use 'I' and 'you' (me).
+- BE INSIGHTFUL. Don't just tell me what's in the picture; tell me why it matters to ME.
+Return ONLY the JSON object."""
+
+            response = GeminiBusiness.client.models.generate_content(
+                model=GeminiBusiness.model_name,
+                contents=[prompt, image_part],
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json'
+                )
+            )
+            import json
+            result = json.loads(response.text)
+            
+            # Store representation in memory is handled by the 'save_to_memory' action being triggered or manual call
+            # But the user specifically asked: "The text representation of the image should be stored in the user memory."
+            # We will return the result, and the socket handler will handle the memory storage of the representation.
+            
+            return result
+
+        except Exception as e:
+            print(f"Image Analysis Error: {e}")
+            print(traceback.format_exc())
+            return {
+                "thoughts": ["I encountered an error while looking at the image."],
+                "title": "Vision Error",
+                "plan": "I'm having trouble analyzing this specific image right now.",
+                "actions": [{"id": "none", "label": "Ok", "type": "none", "payload": ""}]
+            }
+
+    @staticmethod
+    def analyze_voice(audio_base64: str, mime_type: str, history: list, memories: list, action_history: list, current_time: str = None, user_platform: str = None):
+        """
+        Analyzes audio using Gemini and context.
+        """
+        try:
+            history_block = "\n".join([f"- {h}" for h in history])
+            memory_block = "\n".join([f"- {m}" for m in memories])
+            action_block = "\n".join([f"- {a}" for a in action_history])
+            time_context = f"CURRENT TIME: {current_time}\n" if current_time else ""
+
+            # Prepare Audio Part
+            audio_data = base64.b64decode(audio_base64)
+            audio_part = types.Part.from_bytes(data=audio_data, mime_type=mime_type)
+
+            prompt = f"""You are Typira, my personal assistant. I have just shared a voice recording with you. 
+{time_context}Your goal is to transcribe the audio, analyze the text, and combine it with my history, memory, and recent actions to provide an insightful context.
+
+MY TYPING HISTORY:
+{history_block}
+
+MY PERSISTENT MEMORIES:
+{memory_block}
+
+MY RECENT ACTIONS:
+{action_block}
+
+USER PLATFORM: {user_platform or "unknown"}
+
+INSTRUCTIONS:
+1. Transcribe the audio precisely.
+2. Cross-reference the transcription with my history and memories to find deeper relevance.
+3. Formulate a multi-step 'Thought Process':
+   - Analyze the spoken content and its intent.
+   - Connect it to my personality, history, or current needs.
+   - VERIFY the insight is truly useful.
+   - Propose proactive actions.
+4. Return a 'title' for this insight (short, 3-4 words).
+5. Return a 'transcription' (the exact text of what I said).
+6. Return a 'plan' (the actual insightful context you present to me). 
+7. Return a list of 'actions' (buttons) I can take. 
+   - Mandatory: At least one 'prompt_trigger' action to "Save to memory" (payload should be the transcription).
+   - Optional: Other useful actions based on the voice command (e.g., "Draft email", "Set reminder", "Perform deep search").
+   - Mandatory: One 'none' action to dismiss.
+
+OUTPUT FORMAT (Strict JSON):
+{{
+  "thoughts": [
+      "I'm transcribing your voice message...", 
+      "You mentioned needing a formal draft for the meeting...", 
+      "Connecting this to your history with Project X...",
+      "VERIFICATION: Ensuring the proposed draft matches your professional tone.",
+      "Finalizing the plan."
+  ],
+  "title": "Voice Command Received",
+  "transcription": "Please help me draft a formal apology for the delay in Project X milestones.",
+  "plan": "I've transcribed your request. I see you're concerned about the Project X timeline. I can draft that formal apology for you now, incorporating the specific milestones we discussed yesterday.",
+  "actions": [
+     {{
+       "id": "save_to_memory",
+       "label": "💾 Save to Memory",
+       "type": "prompt_trigger",
+       "payload": "Please remember that I'm working on a formal draft for the Project X delay."
+     }},
+     {{
+       "id": "draft_apology",
+       "label": "✍️ Draft Apology",
+       "type": "prompt_trigger",
+       "payload": "Draft a formal apology for the Project X delay based on the milestones in my history."
+     }},
+     {{
+       "id": "none",
+       "label": "❌ Dismiss",
+       "type": "none",
+       "payload": ""
+     }}
+  ]
+}}
+
+- Use 'I' and 'you' (me).
+- BE INSIGHTFUL.
+Return ONLY the JSON object."""
+
+            response = GeminiBusiness.client.models.generate_content(
+                model=GeminiBusiness.model_name,
+                contents=[prompt, audio_part],
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json'
+                )
+            )
+            import json
+            if not response.text:
+                raise Exception("Empty response from AI or blocked by safety filters.")
+            return json.loads(response.text)
+
+        except Exception as e:
+            print(f"Voice Analysis Error: {e}")
+            print(traceback.format_exc())
+            return {
+                "thoughts": ["I encountered an error while listening to the audio."],
+                "title": "Voice Error",
+                "plan": "I'm having trouble analyzing your voice recording right now.",
+                "actions": [{"id": "none", "label": "Ok", "type": "none", "payload": ""}]
+            }
+
+    @staticmethod
+    def analyze_text_command(text: str, history: list, memories: list, action_history: list, current_time: str = None, user_platform: str = None):
+        """
+        Analyzes manually entered text using Gemini and context.
+        """
+        try:
+            history_block = "\n".join([f"- {h}" for h in history])
+            memory_block = "\n".join([f"- {m}" for m in memories])
+            action_block = "\n".join([f"- {a}" for a in action_history])
+            time_context = f"CURRENT TIME: {current_time}\n" if current_time else ""
+
+            prompt = f"""You are Typira, my personal assistant. I have just sent you a manual text command. 
+{time_context}Your goal is to analyze the text and combine it with my history, memory, and recent actions to provide an insightful context.
+
+MY TYPING HISTORY:
+{history_block}
+
+MY PERSISTENT MEMORIES:
+{memory_block}
+
+MY RECENT ACTIONS:
+{action_block}
+
+MY INPUT TEXT: "{text}"
+
+USER PLATFORM: {user_platform or "unknown"}
+
+INSTRUCTIONS:
+1. Analyze my input text precisely.
+2. Cross-reference the message with my history and memories to find deeper relevance or related tasks.
+3. Formulate a multi-step 'Thought Process':
+   - Analyze the intent behind my manual input.
+   - Connect it to my personality, history, or current needs.
+   - VERIFY the insight is truly useful and proactive.
+   - Propose 2-3 specific actions.
+4. Return a 'title' for this insight (short, 3-4 words).
+5. Return a 'plan' (the actual insightful context you present to me). 
+6. Return a list of 'actions' (buttons) I can take. 
+   - Mandatory: One 'none' action to dismiss.
+
+OUTPUT FORMAT (Strict JSON):
+{{
+  "thoughts": [
+      "I'm analyzing your request about the upcoming trip...", 
+      "I see you mentioned wanting to visit Kyoto in your history...", 
+      "VERIFICATION: Proposing a specific itinerary draft based on your travel style.",
+      "Finalizing the plan."
+  ],
+  "title": "Travel Insight",
+  "plan": "I've analyzed your request. Based on your previous interest in traditional architecture and your mention of a Japan trip, I can help you draft a 3-day Kyoto itinerary right now.",
+  "actions": [
+     {{
+       "id": "draft_itinerary",
+       "label": "✍️ Draft Itinerary",
+       "type": "prompt_trigger",
+       "payload": "Draft a 3-day Kyoto itinerary highlighting traditional architecture."
+     }},
+     {{
+       "id": "find_flights",
+       "label": "✈️ Find Flights",
+       "type": "deep_link",
+       "payload": "https://www.google.com/travel/flights"
+     }},
+     {{
+       "id": "none",
+       "label": "❌ Dismiss",
+       "type": "none",
+       "payload": ""
+     }}
+  ]
+}}
+
+- Use 'I' and 'you' (me).
+- BE INSIGHTFUL.
+Return ONLY the JSON object."""
+
+            response = GeminiBusiness.client.models.generate_content(
+                model=GeminiBusiness.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json'
+                )
+            )
+            import json
+            if not response.text:
+                raise Exception("Empty response from AI or blocked by safety filters.")
+            return json.loads(response.text)
+
+        except Exception as e:
+            print(f"Text Analysis Error: {e}")
+            print(traceback.format_exc())
+            return {
+                "thoughts": ["I encountered an error while processing your text."],
+                "title": "Text Error",
+                "plan": "I'm having trouble analyzing your request right now.",
+                "actions": [{"id": "none", "label": "Ok", "type": "none", "payload": ""}]
+            }

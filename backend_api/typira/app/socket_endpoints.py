@@ -349,3 +349,141 @@ def handle_decline_action(data):
     
     # 3. We NO LONGER call find_priority here. 
     # The frontend will wait 5 seconds and call 'get_priority' manually.
+
+@socketio.on('analyze_image', namespace='/home')
+def handle_analyze_image(data):
+    """
+    Handles image analysis request from the Mobile Home screen.
+    """
+    user_id = get_socket_user_id()
+    if not user_id: return
+
+    from app.business.gemini_business import GeminiBusiness
+    image_base64 = data.get('image')
+    mime_type = data.get('mime_type', 'image/jpeg')
+    platform = data.get('platform')
+
+    emit('thought_update', {'text': "Analyzing your image..."}, namespace='/home')
+
+    # 1. Fetch Context
+    history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.date_updated.desc()).limit(30).all()
+    memories = Memory.query.filter_by(user_id=user_id).order_by(Memory.timestamp.desc()).limit(20).all()
+    recent_actions = UserAction.query.filter_by(user_id=user_id).order_by(UserAction.timestamp.desc()).limit(15).all()
+
+    history_list = [f"{h.content} (Logged on {h.date_updated.strftime('%Y-%m-%d %H:%M:%S')})" for h in history]
+    memory_list = [f"{m.content} (Logged on {m.timestamp.strftime('%Y-%m-%d %H:%M:%S')})" for m in memories]
+    action_history = [f"{a.decision.upper()}: {a.context or a.action_id} at {a.timestamp.strftime('%Y-%m-%d %H:%M:%S')}" for a in recent_actions]
+
+    # 2. Call Gemini
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    analysis = GeminiBusiness.analyze_image(image_base64, mime_type, history_list, memory_list, action_history, current_time=current_time, user_platform=platform)
+
+    # 3. Stream Thoughts
+    thoughts = analysis.get('thoughts', [])
+    for thought in thoughts:
+        emit('thought_update', {'text': thought}, namespace='/home')
+        socketio.sleep(3)
+
+    # 4. Store Representative Context in Memory
+    # Extract the summary from the 'save_to_memory' action payload or use the plan
+    save_action = next((a for a in analysis.get('actions', []) if a['id'] == 'save_to_memory'), None)
+    memory_content = save_action['payload'] if save_action else analysis.get('plan', '')
+    
+    new_memory = Memory(user_id=user_id, content=f"Visual Context: {memory_content}", source_type='image_analysis')
+    db.session.add(new_memory)
+    db.session.commit()
+
+    # 5. Emit Result
+    # Reuse onPriorityTask structure for UI compatibility
+    analysis['thought'] = analysis.get('plan', '')
+    emit('priority_task', analysis, namespace='/home')
+
+@socketio.on('analyze_voice', namespace='/home')
+def handle_analyze_voice(data):
+    """
+    Handles voice recording analysis request from the Mobile Home screen.
+    """
+    user_id = get_socket_user_id()
+    if not user_id: return
+
+    from app.business.gemini_business import GeminiBusiness
+    audio_base64 = data.get('audio')
+    mime_type = data.get('mime_type', 'audio/m4a')
+    platform = data.get('platform')
+
+    emit('thought_update', {'text': "Transcribing your voice..."}, namespace='/home')
+
+    # 1. Fetch Context
+    history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.date_updated.desc()).limit(30).all()
+    memories = Memory.query.filter_by(user_id=user_id).order_by(Memory.timestamp.desc()).limit(20).all()
+    recent_actions = UserAction.query.filter_by(user_id=user_id).order_by(UserAction.timestamp.desc()).limit(15).all()
+
+    history_list = [f"{h.content} (Logged on {h.date_updated.strftime('%Y-%m-%d %H:%M:%S')})" for h in history]
+    memory_list = [f"{m.content} (Logged on {m.timestamp.strftime('%Y-%m-%d %H:%M:%S')})" for m in memories]
+    action_history = [f"{a.decision.upper()}: {a.context or a.action_id} at {a.timestamp.strftime('%Y-%m-%d %H:%M:%S')}" for a in recent_actions]
+
+    # 2. Call Gemini
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    analysis = GeminiBusiness.analyze_voice(audio_base64, mime_type, history_list, memory_list, action_history, current_time=current_time, user_platform=platform)
+
+    # 3. Stream Thoughts
+    thoughts = analysis.get('thoughts', [])
+    for thought in thoughts:
+        emit('thought_update', {'text': thought}, namespace='/home')
+        socketio.sleep(3)
+
+    # 4. Store Transcription and Insight in Memory
+    transcription = analysis.get('transcription', 'Audio recording')
+    plan = analysis.get('plan', '')
+    
+    new_memory = Memory(user_id=user_id, content=f"Voice Command: {transcription}\nInsight: {plan}", source_type='voice_analysis')
+    db.session.add(new_memory)
+    db.session.commit()
+
+    # 5. Emit Result
+    analysis['thought'] = analysis.get('plan', '')
+    emit('priority_task', analysis, namespace='/home')
+
+@socketio.on('analyze_text', namespace='/home')
+def handle_analyze_text(data):
+    """
+    Handles manual text command analysis request from the Mobile Home screen.
+    """
+    user_id = get_socket_user_id()
+    if not user_id: return
+
+    from app.business.gemini_business import GeminiBusiness
+    text = data.get('text')
+    platform = data.get('platform')
+
+    if not text: return
+
+    # 0. Store in Typing History
+    new_history = TypingHistory(user_id=user_id, content=text)
+    db.session.add(new_history)
+    db.session.commit()
+
+    emit('thought_update', {'text': "Analyzing your input..."}, namespace='/home')
+
+    # 1. Fetch Context
+    history = TypingHistory.query.filter_by(user_id=user_id).order_by(TypingHistory.date_updated.desc()).limit(30).all()
+    memories = Memory.query.filter_by(user_id=user_id).order_by(Memory.timestamp.desc()).limit(20).all()
+    recent_actions = UserAction.query.filter_by(user_id=user_id).order_by(UserAction.timestamp.desc()).limit(15).all()
+
+    history_list = [f"{h.content} (Logged on {h.date_updated.strftime('%Y-%m-%d %H:%M:%S')})" for h in history]
+    memory_list = [f"{m.content} (Logged on {m.timestamp.strftime('%Y-%m-%d %H:%M:%S')})" for m in memories]
+    action_history = [f"{a.decision.upper()}: {a.context or a.action_id} at {a.timestamp.strftime('%Y-%m-%d %H:%M:%S')}" for a in recent_actions]
+
+    # 2. Call Gemini
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    analysis = GeminiBusiness.analyze_text_command(text, history_list, memory_list, action_history, current_time=current_time, user_platform=platform)
+
+    # 3. Stream Thoughts
+    thoughts = analysis.get('thoughts', [])
+    for thought in thoughts:
+        emit('thought_update', {'text': thought}, namespace='/home')
+        socketio.sleep(3)
+
+    # 4. Emit Result
+    analysis['thought'] = analysis.get('plan', '')
+    emit('priority_task', analysis, namespace='/home')
