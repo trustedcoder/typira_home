@@ -13,166 +13,243 @@ class InsightsFragment extends StatelessWidget {
     final controller = Get.put(InsightsController());
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 100.h), // Added 100.h bottom padding
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Agent Insights",
-              style: TextStyle( color: Colors.white, fontSize: 24.sp, fontWeight: FontWeight.bold, fontFamily: 'Inter' ),
-            ),
-            SizedBox(height: 24.h),
-            
-            // Top Stats Row
-            Row(
-              children: [
-                Expanded(child: _buildStatCard("Time Saved", "${controller.timeSavedMinutes}m", Icons.timer, AppTheme.accentColor)),
-                SizedBox(width: 16.w),
-                Expanded(child: _buildStatCard("Focus Score", "${controller.focusScore}", Icons.center_focus_strong, const Color(0xFF00E676))),
-              ],
-            ),
-            SizedBox(height: 16.h),
-            _buildStatCard("Words Polished", "${controller.wordsPolished}", Icons.auto_awesome, const Color(0xFFD500F9), fullWidth: true),
-            
-            SizedBox(height: 32.h),
-            Text("Bio-Digital Analysis (Beta)", style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8.h),
-            Text("Inferred from keyboard dynamics & sentiment.", style: TextStyle(color: Colors.white38, fontSize: 12.sp)),
-            SizedBox(height: 16.h),
+      child: Obx(() {
+        if (controller.isLoading.value && controller.activityData.isEmpty) {
+          return const Center(
+              child: CircularProgressIndicator(color: AppTheme.accentColor));
+        }
 
-            // Bio Stats Grid
-            Column(
+        return RefreshIndicator(
+          onRefresh: () async {
+            await controller.fetchInsights();
+          },
+          color: AppTheme.accentColor,
+          backgroundColor: const Color(0xFF1E293B),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 100.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  "Agent Insights",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24.sp,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Inter'),
+                ),
+                SizedBox(height: 24.h),
+
+                // Top Stats Row
                 Row(
                   children: [
                     Expanded(
-                      child: _buildBioCard(
-                        "Current Mood", 
-                        controller.currentMood.value, 
-                        Icons.emoji_emotions, 
-                        Colors.amber,
-                        subtitle: "Positive Sentiment"
-                      ),
-                    ),
+                        child: _buildStatCard(
+                            "Time Saved",
+                            "${controller.timeSavedMinutes.value}m",
+                            Icons.timer,
+                            AppTheme.accentColor)),
                     SizedBox(width: 16.w),
                     Expanded(
-                      child: _buildBioCard(
-                        "Stress Level", 
-                        "${controller.stressLevel.value}%", 
-                        Icons.speed, 
-                        Colors.lightBlueAccent,
-                        subtitle: "Optimal Flow"
-                      ),
-                    ),
+                        child: _buildStatCard(
+                            "Focus Score",
+                            "${controller.focusScore.value}",
+                            Icons.center_focus_strong,
+                            const Color(0xFF00E676))),
                   ],
                 ),
                 SizedBox(height: 16.h),
-                Row(
+                _buildStatCard(
+                    "Words Polished", "${controller.wordsPolished.value}",
+                    Icons.auto_awesome, const Color(0xFFD500F9),
+                    fullWidth: true),
+
+                SizedBox(height: 32.h),
+                Text("Bio-Digital Analysis (Beta)",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.bold)),
+                SizedBox(height: 8.h),
+                Text("Inferred from keyboard dynamics & sentiment.",
+                    style: TextStyle(color: Colors.white38, fontSize: 12.sp)),
+                SizedBox(height: 16.h),
+
+                // Bio Stats Grid
+                Column(
                   children: [
-                    Expanded(
-                      child: _buildBioCard(
-                        "Energy Level", 
-                        controller.energyLevel.value, 
-                        Icons.bolt, 
-                        Colors.orangeAccent,
-                        subtitle: "Typing Bursts"
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildBioCard(
+                              "Current Mood",
+                              controller.currentMood.value,
+                              Icons.emoji_emotions,
+                              Colors.amber,
+                              subtitle: "Positive Sentiment"),
+                        ),
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: _buildBioCard(
+                              "Stress Level",
+                              "${controller.stressLevel.value}%",
+                              Icons.speed,
+                              Colors.lightBlueAccent,
+                              subtitle: "Optimal Flow"),
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 16.w),
-                    Expanded(
-                      child: _buildBioCard(
-                        "Tone Profile", 
-                        controller.toneProfile.value, 
-                        Icons.translate, 
-                        Colors.purpleAccent,
-                        subtitle: "Vocabulary Analysis"
-                      ),
+                    SizedBox(height: 16.h),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildBioCard(
+                              "Energy Level",
+                              controller.energyLevel.value,
+                              Icons.bolt,
+                              Colors.orangeAccent,
+                              subtitle: "Typing Bursts"),
+                        ),
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: _buildBioCard(
+                              "Tone Profile",
+                              controller.toneProfile.value,
+                              Icons.translate,
+                              Colors.purpleAccent,
+                              subtitle: "Vocabulary Analysis"),
+                        ),
+                      ],
                     ),
                   ],
                 ),
+
+                SizedBox(height: 32.h),
+                Text("Activity Trend",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.bold)),
+                SizedBox(height: 16.h),
+
+                // Line Chart
+                Container(
+                  height: 200.h,
+                  padding: EdgeInsets.only(right: 20.w, top: 10.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
+                  child: controller.activityData.isEmpty
+                      ? const Center(
+                          child: Text("No activity data available",
+                              style: TextStyle(color: Colors.white38)))
+                      : LineChart(
+                          LineChartData(
+                            gridData: FlGridData(show: false),
+                            titlesData: FlTitlesData(
+                              leftTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                              topTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                              rightTitles: AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false)),
+                              bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                      showTitles: true,
+                                      getTitlesWidget: (value, meta) {
+                                        const days = [
+                                          "M",
+                                          "T",
+                                          "W",
+                                          "T",
+                                          "F",
+                                          "S",
+                                          "S"
+                                        ];
+                                        if (value.toInt() >= 0 &&
+                                            value.toInt() < days.length) {
+                                          return Text(days[value.toInt()],
+                                              style: TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 10.sp));
+                                        }
+                                        return const Text("");
+                                      },
+                                      interval: 1)),
+                            ),
+                            borderData: FlBorderData(show: false),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: controller.activityData,
+                                isCurved: true,
+                                color: AppTheme.accentColor,
+                                barWidth: 4,
+                                isStrokeCapRound: true,
+                                dotData: FlDotData(show: false),
+                                belowBarData: BarAreaData(
+                                    show: true,
+                                    color: AppTheme.accentColor.withOpacity(0.1)),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+
+                SizedBox(height: 32.h),
+                Text("Interaction Modes",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.bold)),
+                SizedBox(height: 16.h),
+
+                // Pie Chart
+                Container(
+                  height: 200.h,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(20.r),
+                  ),
+                  child: controller.interactionModeData.isEmpty
+                      ? const Center(
+                          child: Text("No interaction data available",
+                              style: TextStyle(color: Colors.white38)))
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: PieChart(
+                                PieChartData(
+                                  sections: controller.interactionModeData,
+                                  centerSpaceRadius: 40,
+                                  sectionsSpace: 2,
+                                ),
+                              ),
+                            ),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildLegendItem(
+                                    const Color(0xFF00E5FF), "Vision"),
+                                SizedBox(height: 8.h),
+                                _buildLegendItem(
+                                    const Color(0xFFD500F9), "Voice"),
+                                SizedBox(height: 8.h),
+                                _buildLegendItem(
+                                    const Color(0xFF2979FF), "Text"),
+                              ],
+                            ),
+                            SizedBox(width: 40.w),
+                          ],
+                        ),
+                )
               ],
             ),
-            
-            SizedBox(height: 32.h),
-            Text("Activity Trend", style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)),
-            SizedBox(height: 16.h),
-            
-            // Line Chart
-            Container(
-              height: 200.h,
-              padding: EdgeInsets.only(right: 20.w, top: 10.h),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: LineChart(
-                LineChartData(
-                  gridData: FlGridData(show: false),
-                  titlesData: FlTitlesData(
-                    leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (value, meta) {
-                       return Text(["M", "T", "W", "T", "F", "S", "S"][value.toInt()], style: TextStyle(color: Colors.white54, fontSize: 10.sp));
-                    }, interval: 1)),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: controller.activityData,
-                      isCurved: true,
-                      color: AppTheme.accentColor,
-                      barWidth: 4,
-                      isStrokeCapRound: true,
-                      dotData: FlDotData(show: false),
-                      belowBarData: BarAreaData(show: true, color: AppTheme.accentColor.withOpacity(0.1)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            SizedBox(height: 32.h),
-            Text("Interaction Modes", style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)),
-            SizedBox(height: 16.h),
-
-            // Pie Chart
-            Container(
-              height: 200.h,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: PieChart(
-                      PieChartData(
-                        sections: controller.interactionModeData,
-                        centerSpaceRadius: 40,
-                        sectionsSpace: 2,
-                      ),
-                    ),
-                  ),
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLegendItem(const Color(0xFF00E5FF), "Vision"),
-                      SizedBox(height: 8.h),
-                      _buildLegendItem(const Color(0xFFD500F9), "Voice"),
-                      SizedBox(height: 8.h),
-                      _buildLegendItem(const Color(0xFF2979FF), "Text"),
-                    ],
-                  ),
-                  SizedBox(width: 40.w),
-                ],
-              ),
-            )
-          ],
-        ),
-      ),
+          ),
+        );
+      }),
     );
   }
 

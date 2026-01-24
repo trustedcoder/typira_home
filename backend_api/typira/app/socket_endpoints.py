@@ -3,6 +3,7 @@ from flask_socketio import emit
 from app import socketio, db
 from app.models.context import TypingHistory, Memory, UserAction
 from app.models.users import User
+from app.helpers.insight_helpers import increment_user_stats
 # from app.helpers.auth_helpers import token_required_socket # We need a socket version of this
 import datetime
 import time
@@ -140,10 +141,15 @@ def async_persist_context(app, user_id, text, app_context, is_full):
         from app.models.context import TypingHistory
         from app.helpers.atomizer import split_into_sentences, scrub_pii
         from app.helpers.semantic import get_semantic_hash
+        from app.helpers.insight_helpers import increment_user_stats
         import datetime
 
         atoms = split_into_sentences(text)
         num_atoms = len(atoms)
+        
+        # Word count for insights
+        total_words = sum(len(atom.split()) for atom in atoms)
+        increment_user_stats(user_id, words=total_words)
         
         for i, atom in enumerate(atoms):
             if not atom or len(atom.strip()) < 3:
@@ -236,10 +242,42 @@ def handle_analyze(data):
         socketio.sleep(10) # Allow user to read the thinking process
         
     # 4. Finalize and Show Actions
+    insights = analysis.get('insights')
+    if insights:
+        bio = insights.get('bio_data', {})
+        mood_data = bio.get('current_mood', {})
+        stress_data = bio.get('stress_level', {})
+        energy_data = bio.get('energy_level', {})
+        tone_data = bio.get('tone_profile', {})
+        
+        increment_user_stats(
+            user_id, 
+            minutes=insights.get('time_saved_minutes', 0), 
+            words=insights.get('words_polished', 0),
+            focus=insights.get('focus_score'),
+            mood=mood_data.get('mood'),
+            mood_emoji=mood_data.get('emoji'),
+            mood_color=mood_data.get('hex_color'),
+            stress=stress_data.get('level'),
+            stress_conclusion=stress_data.get('conclusion'),
+            stress_emoji=stress_data.get('emoji'),
+            stress_color=stress_data.get('hex_color'),
+            energy=energy_data.get('level'),
+            energy_conclusion=energy_data.get('conclusion'),
+            energy_emoji=energy_data.get('emoji'),
+            energy_color=energy_data.get('hex_color'),
+            tone=tone_data.get('tone'),
+            tone_conclusion=tone_data.get('conclusion'),
+            tone_emoji=tone_data.get('emoji'),
+            tone_color=tone_data.get('hex_color'),
+            sentiment=mood_data.get('sentiment')
+        )
+
     emit('thought_update', {'text': analysis.get('final_thought', 'Ready.')})
     emit('suggestion_ready', {
         'thought': analysis.get('final_thought', ''),
-        'actions': analysis.get('actions', [])
+        'actions': analysis.get('actions', []),
+        'insights': insights
     })
     
 @socketio.on('approve_action', namespace='/home')
@@ -268,6 +306,7 @@ def handle_approve_action(data):
     # 2. Record approval for the priority loop memory
     new_action = UserAction(user_id=user_id, action_id=action_id, decision='approved', context=str(payload))
     db.session.add(new_action)
+    
     db.session.commit()
     
     # 3. Call the Agentic Brain for specialized execution
@@ -289,10 +328,42 @@ def handle_approve_action(data):
         db.session.commit()
 
     # 6. Return result specifically for the Mobile App
+    insights = execution.get('insights')
+    if insights:
+        bio = insights.get('bio_data', {})
+        mood_data = bio.get('current_mood', {})
+        stress_data = bio.get('stress_level', {})
+        energy_data = bio.get('energy_level', {})
+        tone_data = bio.get('tone_profile', {})
+
+        increment_user_stats(
+            user_id, 
+            minutes=insights.get('time_saved_minutes', 0), 
+            words=insights.get('words_polished', 0),
+            focus=insights.get('focus_score'),
+            mood=mood_data.get('mood'),
+            mood_emoji=mood_data.get('emoji'),
+            mood_color=mood_data.get('hex_color'),
+            stress=stress_data.get('level'),
+            stress_conclusion=stress_data.get('conclusion'),
+            stress_emoji=stress_data.get('emoji'),
+            stress_color=stress_data.get('hex_color'),
+            energy=energy_data.get('level'),
+            energy_conclusion=energy_data.get('conclusion'),
+            energy_emoji=energy_data.get('emoji'),
+            energy_color=energy_data.get('hex_color'),
+            tone=tone_data.get('tone'),
+            tone_conclusion=tone_data.get('conclusion'),
+            tone_emoji=tone_data.get('emoji'),
+            tone_color=tone_data.get('hex_color'),
+            sentiment=mood_data.get('sentiment')
+        )
+
     emit('action_result', {
         'thought': thoughts[-1] if thoughts else 'Task complete.',
         'result': execution.get('result', ''),
-        'action_id': action_id
+        'action_id': action_id,
+        'insights': insights
     }, namespace='/home')
 
 @socketio.on('perform_action', namespace='/agent')
@@ -321,11 +392,44 @@ def handle_perform_action(data):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     execution = GeminiBusiness.perform_keyboard_agentic_action(action_id, payload, context, combined_history, current_time=current_time)
     
+    # Update Insights
+    insights = execution.get('insights')
+    if insights:
+        bio = insights.get('bio_data', {})
+        mood_data = bio.get('current_mood', {})
+        stress_data = bio.get('stress_level', {})
+        energy_data = bio.get('energy_level', {})
+        tone_data = bio.get('tone_profile', {})
+
+        increment_user_stats(
+            user_id, 
+            minutes=insights.get('time_saved_minutes', 0), 
+            words=insights.get('words_polished', 0),
+            focus=insights.get('focus_score'),
+            mood=mood_data.get('mood'),
+            mood_emoji=mood_data.get('emoji'),
+            mood_color=mood_data.get('hex_color'),
+            stress=stress_data.get('level'),
+            stress_conclusion=stress_data.get('conclusion'),
+            stress_emoji=stress_data.get('emoji'),
+            stress_color=stress_data.get('hex_color'),
+            energy=energy_data.get('level'),
+            energy_conclusion=energy_data.get('conclusion'),
+            energy_emoji=energy_data.get('emoji'),
+            energy_color=energy_data.get('hex_color'),
+            tone=tone_data.get('tone'),
+            tone_conclusion=tone_data.get('conclusion'),
+            tone_emoji=tone_data.get('emoji'),
+            tone_color=tone_data.get('hex_color'),
+            sentiment=mood_data.get('sentiment')
+        )
+    
     # Still return result for UI feedback
     emit('suggestion_ready', {
         'thought': execution.get('thought', ''),
         'result': execution.get('result', ''),
-        'actions': [] 
+        'actions': [],
+        'insights': insights
     })
 
 @socketio.on('decline_action', namespace='/home')
@@ -391,6 +495,39 @@ def handle_analyze_image(data):
     
     new_memory = Memory(user_id=user_id, content=f"Visual Context: {memory_content}", source_type='image_analysis')
     db.session.add(new_memory)
+    
+    # Update Insights
+    insights = analysis.get('insights')
+    if insights:
+        bio = insights.get('bio_data', {})
+        mood_data = bio.get('current_mood', {})
+        stress_data = bio.get('stress_level', {})
+        energy_data = bio.get('energy_level', {})
+        tone_data = bio.get('tone_profile', {})
+
+        increment_user_stats(
+            user_id, 
+            minutes=insights.get('time_saved_minutes', 0), 
+            words=insights.get('words_polished', 0),
+            focus=insights.get('focus_score'),
+            mood=mood_data.get('mood'),
+            mood_emoji=mood_data.get('emoji'),
+            mood_color=mood_data.get('hex_color'),
+            stress=stress_data.get('level'),
+            stress_conclusion=stress_data.get('conclusion'),
+            stress_emoji=stress_data.get('emoji'),
+            stress_color=stress_data.get('hex_color'),
+            energy=energy_data.get('level'),
+            energy_conclusion=energy_data.get('conclusion'),
+            energy_emoji=energy_data.get('emoji'),
+            energy_color=energy_data.get('hex_color'),
+            tone=tone_data.get('tone'),
+            tone_conclusion=tone_data.get('conclusion'),
+            tone_emoji=tone_data.get('emoji'),
+            tone_color=tone_data.get('hex_color'),
+            sentiment=mood_data.get('sentiment')
+        )
+    
     db.session.commit()
 
     # 5. Emit Result
@@ -438,6 +575,39 @@ def handle_analyze_voice(data):
     
     new_memory = Memory(user_id=user_id, content=f"Voice Command: {transcription}\nInsight: {plan}", source_type='voice_analysis')
     db.session.add(new_memory)
+    
+    # Update Insights
+    insights = analysis.get('insights')
+    if insights:
+        bio = insights.get('bio_data', {})
+        mood_data = bio.get('current_mood', {})
+        stress_data = bio.get('stress_level', {})
+        energy_data = bio.get('energy_level', {})
+        tone_data = bio.get('tone_profile', {})
+
+        increment_user_stats(
+            user_id, 
+            minutes=insights.get('time_saved_minutes', 0), 
+            words=insights.get('words_polished', 0),
+            focus=insights.get('focus_score'),
+            mood=mood_data.get('mood'),
+            mood_emoji=mood_data.get('emoji'),
+            mood_color=mood_data.get('hex_color'),
+            stress=stress_data.get('level'),
+            stress_conclusion=stress_data.get('conclusion'),
+            stress_emoji=stress_data.get('emoji'),
+            stress_color=stress_data.get('hex_color'),
+            energy=energy_data.get('level'),
+            energy_conclusion=energy_data.get('conclusion'),
+            energy_emoji=energy_data.get('emoji'),
+            energy_color=energy_data.get('hex_color'),
+            tone=tone_data.get('tone'),
+            tone_conclusion=tone_data.get('conclusion'),
+            tone_emoji=tone_data.get('emoji'),
+            tone_color=tone_data.get('hex_color'),
+            sentiment=mood_data.get('sentiment')
+        )
+    
     db.session.commit()
 
     # 5. Emit Result
@@ -485,5 +655,36 @@ def handle_analyze_text(data):
         socketio.sleep(3)
 
     # 4. Emit Result
+    insights = analysis.get('insights')
+    if insights:
+        bio = insights.get('bio_data', {})
+        mood_data = bio.get('current_mood', {})
+        stress_data = bio.get('stress_level', {})
+        energy_data = bio.get('energy_level', {})
+        tone_data = bio.get('tone_profile', {})
+
+        increment_user_stats(
+            user_id, 
+            minutes=insights.get('time_saved_minutes', 0), 
+            words=insights.get('words_polished', 0),
+            focus=insights.get('focus_score'),
+            mood=mood_data.get('mood'),
+            mood_emoji=mood_data.get('emoji'),
+            mood_color=mood_data.get('hex_color'),
+            stress=stress_data.get('level'),
+            stress_conclusion=stress_data.get('conclusion'),
+            stress_emoji=stress_data.get('emoji'),
+            stress_color=stress_data.get('hex_color'),
+            energy=energy_data.get('level'),
+            energy_conclusion=energy_data.get('conclusion'),
+            energy_emoji=energy_data.get('emoji'),
+            energy_color=energy_data.get('hex_color'),
+            tone=tone_data.get('tone'),
+            tone_conclusion=tone_data.get('conclusion'),
+            tone_emoji=tone_data.get('emoji'),
+            tone_color=tone_data.get('hex_color'),
+            sentiment=mood_data.get('sentiment')
+        )
+
     analysis['thought'] = analysis.get('plan', '')
     emit('priority_task', analysis, namespace='/home')
