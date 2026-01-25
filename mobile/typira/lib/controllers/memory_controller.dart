@@ -1,76 +1,113 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import '../api/memory_api.dart';
 
 class MemoryItem {
+  final String id;
   final String title;
-  final String timestamp;
-  final String type; // 'text', 'plan', 'image', 'voice'
-  final String contentSnippet;
-  final String fullContent; // Markdown supported
-  final String? mediaPath; // Local path or URL
-  final IconData icon;
-  final Color color;
+  final String content;
+  final String icon;
+  final String timeAgo;
+  final DateTime timestamp;
 
   MemoryItem({
+    required this.id,
     required this.title,
-    required this.timestamp,
-    required this.type,
-    required this.contentSnippet,
-    this.fullContent = "",
-    this.mediaPath,
+    required this.content,
     required this.icon,
-    required this.color,
+    required this.timeAgo,
+    required this.timestamp,
   });
+
+  factory MemoryItem.fromJson(Map<String, dynamic> json) {
+    return MemoryItem(
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      content: json['content'] ?? '',
+      icon: json['icon'] ?? '📝',
+      timeAgo: json['time_ago'] ?? '',
+      timestamp: json['timestamp'] != null 
+          ? DateTime.parse(json['timestamp']) 
+          : DateTime.now(),
+    );
+  }
+}
+
+class PaginatedData<T> {
+  var items = <T>[].obs;
+  var currentPage = 1.obs;
+  var hasNext = true.obs;
+  var isLoading = false.obs;
+  var isLoadingMore = false.obs;
+
+  void reset() {
+    items.clear();
+    currentPage.value = 1;
+    hasNext.value = true;
+    isLoading.value = false;
+    isLoadingMore.value = false;
+  }
 }
 
 class MemoryController extends GetxController {
-  
-  var memoryItems = <MemoryItem>[].obs;
+  final MemoryApi _api = MemoryApi();
+
+  final memories = PaginatedData<MemoryItem>();
+  final typingHistory = PaginatedData<MemoryItem>();
+  final userActions = PaginatedData<MemoryItem>();
 
   @override
   void onInit() {
     super.onInit();
-    loadMockData();
+    fetchMemories();
+    fetchTypingHistory();
+    fetchUserActions();
   }
 
-  void loadMockData() {
-    memoryItems.value = [
-      MemoryItem(
-        title: "Weekly Report Draft",
-        timestamp: "2 mins ago",
-        type: "text",
-        contentSnippet: "Summary of Q3 performance...",
-        fullContent: "# Weekly Report - Q3\n\n**Performance Summary**\nOverall, the team has exceeded expectations by 15%.\n\n*   **Revenue**: \$1.2M (+12% YoY)\n*   **User Growth**: 50k new users\n\n## Next Steps\nFocus on retention strategies for the holiday season.",
-        icon: Icons.article,
-        color: const Color(0xFF2979FF),
-      ),
-      MemoryItem(
-        title: "Project Alpha Plan",
-        timestamp: "1 hr ago",
-        type: "plan",
-        contentSnippet: "Step 1: Research Competitors...",
-        fullContent: "# Project Alpha Execution Plan\n\n1.  **Phase 1: Research**\n    *   Analyze top 3 competitors.\n    *   Survey 100 potential users.\n2.  **Phase 2: MVP**\n    *   Build core 'Agent Core' feature.\n    *   Internal beta testing.",
-        icon: Icons.checklist,
-        color: const Color(0xFF00E5FF),
-      ),
-      MemoryItem(
-        title: "Voice Note Analysis",
-        timestamp: "Yesterday",
-        type: "voice",
-        contentSnippet: "Meeting with design team...",
-        fullContent: "**Transcript Summary:**\n\nThe design team discussed the need for a 'Dark Mode' first approach. \n\n> \"We want the agent to feel like a nocturnal companion.\"\n\n**Action Items:**\n*   Update color palette to Slate/Neon.\n*   Refine glassmorphism values.",
-        icon: Icons.mic,
-        color: const Color(0xFFD500F9),
-      ),
-      MemoryItem(
-        title: "Whiteboard Scan",
-        timestamp: "Yesterday",
-        type: "image",
-        contentSnippet: "Architecture diagram V2...",
-        fullContent: "Analyzed the whiteboard structure. Identified 3 main modules:\n1.  User Input\n2.  Agent Core (Processing)\n3.  Output Rendering\n\n*See attached image for details.*",
-        icon: Icons.image,
-        color: const Color(0xFF00E676),
-      ),
-    ];
+  Future<void> fetchMemories({bool isRefresh = false}) async {
+    await _fetchData(memories, _api.getMemories, isRefresh: isRefresh);
+  }
+
+  Future<void> fetchTypingHistory({bool isRefresh = false}) async {
+    await _fetchData(typingHistory, _api.getTypingHistory, isRefresh: isRefresh);
+  }
+
+  Future<void> fetchUserActions({bool isRefresh = false}) async {
+    await _fetchData(userActions, _api.getUserActions, isRefresh: isRefresh);
+  }
+
+  Future<void> _fetchData(
+    PaginatedData<MemoryItem> data,
+    Future<dynamic> Function(int page) apiCall, {
+    bool isRefresh = false,
+  }) async {
+    if (isRefresh) {
+      data.reset();
+    }
+
+    if (data.isLoading.value || data.isLoadingMore.value || !data.hasNext.value) return;
+
+    if (data.items.isEmpty) {
+      data.isLoading.value = true;
+    } else {
+      data.isLoadingMore.value = true;
+    }
+
+    try {
+      final response = await apiCall(data.currentPage.value);
+      final List<dynamic> itemsJson = response['items'];
+      final List<MemoryItem> newItems = itemsJson.map((j) => MemoryItem.fromJson(j)).toList();
+
+      data.items.addAll(newItems);
+      data.hasNext.value = response['has_next'] ?? false;
+      if (data.hasNext.value) {
+        data.currentPage.value++;
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Failed to load data: $e");
+    } finally {
+      data.isLoading.value = false;
+      data.isLoadingMore.value = false;
+    }
   }
 }

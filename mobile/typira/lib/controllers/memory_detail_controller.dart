@@ -13,7 +13,11 @@ class MemoryDetailController extends GetxController {
     } else {
       // Fallback or error handling
       Get.back(); 
-      Get.snackbar("Error", "Memory item not found");
+      Get.snackbar(
+        "Error", 
+        "Memory item not found",
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 }

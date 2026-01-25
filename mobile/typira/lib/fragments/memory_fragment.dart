@@ -1,18 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
-import 'package:get/get.dart';
 import '../controllers/memory_controller.dart';
 import '../activities/memory_detail_activity.dart';
 import '../constants/app_theme.dart';
 
-class MemoryFragment extends StatelessWidget {
+class MemoryFragment extends StatefulWidget {
   const MemoryFragment({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final controller = Get.put(MemoryController());
+  State<MemoryFragment> createState() => _MemoryFragmentState();
+}
 
+class _MemoryFragmentState extends State<MemoryFragment> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final controller = Get.put(MemoryController());
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,81 +46,130 @@ class MemoryFragment extends StatelessWidget {
               ),
             ),
           ),
+          TabBar(
+            controller: _tabController,
+            indicatorColor: const Color(0xFF6366F1),
+            labelColor: const Color(0xFF6366F1),
+            unselectedLabelColor: Colors.white54,
+            tabs: const [
+              Tab(text: "Memory"),
+              Tab(text: "Typing"),
+              Tab(text: "Actions"),
+            ],
+          ),
           Expanded(
-            child: Obx(() => GridView.builder(
-              padding: EdgeInsets.only(left: 24.w, right: 24.w, top: 0, bottom: 100.h), // Added bottom padding
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16.w,
-                mainAxisSpacing: 16.h,
-                childAspectRatio: 0.85,
-              ),
-              itemCount: controller.memoryItems.length,
-              itemBuilder: (context, index) {
-                final item = controller.memoryItems[index];
-                return _buildMemoryCard(item);
-              },
-            )),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPaginatedList(controller.memories, controller.fetchMemories),
+                _buildPaginatedList(controller.typingHistory, controller.fetchTypingHistory),
+                _buildPaginatedList(controller.userActions, controller.fetchUserActions),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMemoryCard(MemoryItem item) {
-    return InkWell(
-      onTap: () => Get.to(() => const MemoryDetailActivity(), arguments: item),
-      borderRadius: BorderRadius.circular(20.r),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(20.r),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
-        ),
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                   color: item.color.withOpacity(0.1),
-                   shape: BoxShape.circle,
-                ),
-                child: Icon(item.icon, color: item.color, size: 20.sp),
-              ),
-              Text(
-                item.timestamp,
-                style: TextStyle(color: Colors.white38, fontSize: 10.sp),
-              ),
-            ],
-          ),
-          Spacer(),
-          Text(
-            item.title,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16.sp,
-              fontWeight: FontWeight.bold,
+  Widget _buildPaginatedList(PaginatedData<MemoryItem> data, Future<void> Function({bool isRefresh}) fetchFn) {
+    return RefreshIndicator(
+      onRefresh: () => fetchFn(isRefresh: true),
+      child: Obx(() {
+        if (data.isLoading.value) {
+          return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+        }
+
+        if (data.items.isEmpty) {
+          return Center(
+            child: Text(
+              "No items found",
+              style: TextStyle(color: Colors.white38, fontSize: 16.sp),
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          );
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.only(left: 20.w, right: 20.w, top: 16.h, bottom: 100.h),
+          itemCount: data.items.length + (data.hasNext.value ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index == data.items.length) {
+              // Load more trigger
+              if (!data.isLoadingMore.value) {
+                Future.microtask(() => fetchFn());
+              }
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+                ),
+              );
+            }
+
+            final item = data.items[index];
+            return _buildMemoryItemTile(item);
+          },
+        );
+      }),
+    );
+  }
+
+  Widget _buildMemoryItemTile(MemoryItem item) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.all(16.w),
+        leading: Container(
+          padding: EdgeInsets.all(10.w),
+          decoration: BoxDecoration(
+            color: const Color(0xFF6366F1).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12.r),
           ),
-          SizedBox(height: 8.h),
-          Text(
-            item.contentSnippet,
+          child: Text(
+            item.icon,
+            style: TextStyle(fontSize: 20.sp),
+          ),
+        ),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                item.title,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              item.timeAgo,
+              style: TextStyle(color: Colors.white38, fontSize: 11.sp),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: EdgeInsets.only(top: 8.h),
+          child: Text(
+            item.content,
             style: TextStyle(
               color: Colors.white54,
-              fontSize: 12.sp,
+              fontSize: 13.sp,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-        ],
+        ),
+        onTap: () => Get.to(() => const MemoryDetailActivity(), arguments: item),
       ),
-    ));
+    );
   }
 }

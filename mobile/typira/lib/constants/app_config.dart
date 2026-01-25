@@ -12,6 +12,9 @@ class AppConfig {
   static const String register = "$baseUrl/auth/register";
   static const String getUser = "$baseUrl/user/me";
   static const String getInsightsStats = "$baseUrl/insights/stats";
+  static const String getMemories = "$baseUrl/memory/memories";
+  static const String getTypingHistory = "$baseUrl/memory/typing-history";
+  static const String getUserActions = "$baseUrl/memory/user-actions";
 
 
 

@@ -20,15 +20,29 @@ class MemoryDetailActivity extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Get.back(),
         ),
+        title: Text(
+          "Details",
+          style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.share, color: Colors.white),
-            onPressed: () {}, // Mock share
+            icon: const Icon(Icons.copy, color: Colors.white, size: 20),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: controller.item.content));
+              Get.snackbar(
+                "Copied",
+                "Content copied to clipboard",
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFF1E293B),
+                colorText: Colors.white,
+              );
+            },
           ),
-          SizedBox(width: 16.w),
+          SizedBox(width: 8.w),
         ],
       ),
       body: SingleChildScrollView(
@@ -42,11 +56,14 @@ class MemoryDetailActivity extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(12.w),
                   decoration: BoxDecoration(
-                    color: controller.item.color.withOpacity(0.1),
+                    color: const Color(0xFF6366F1).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: controller.item.color.withOpacity(0.3)),
+                    border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
                   ),
-                  child: Icon(controller.item.icon, color: controller.item.color, size: 28.sp),
+                  child: Text(
+                    controller.item.icon,
+                    style: TextStyle(fontSize: 28.sp),
+                  ),
                 ),
                 SizedBox(width: 16.w),
                 Expanded(
@@ -59,8 +76,8 @@ class MemoryDetailActivity extends StatelessWidget {
                       ),
                       SizedBox(height: 4.h),
                       Text(
-                        "${controller.item.timestamp} • ${controller.item.type.toUpperCase()}",
-                        style: TextStyle(color: Colors.white54, fontSize: 12.sp, fontWeight: FontWeight.w600),
+                        controller.item.timeAgo,
+                        style: TextStyle(color: Colors.white54, fontSize: 13.sp, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -69,60 +86,40 @@ class MemoryDetailActivity extends StatelessWidget {
             ),
             
             SizedBox(height: 32.h),
-            Divider(color: Colors.white10),
+            Divider(color: Colors.white.withOpacity(0.05)),
             SizedBox(height: 32.h),
 
-            // Content Body based on Type
-            _buildContentBody(controller),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContentBody(MemoryDetailController controller) {
-    // If it's an image type and no path mock, we show placeholder
-    if (controller.item.type == 'image') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            height: 250.h,
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(16.r),
-              border: Border.all(color: Colors.white12),
+            // Content Body
+            Container(
+              padding: EdgeInsets.all(20.w),
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16.r),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: MarkdownBody(
+                data: controller.item.content,
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(color: Colors.white, fontSize: 16.sp, height: 1.6),
+                  h1: TextStyle(color: Colors.white, fontSize: 24.sp, fontWeight: FontWeight.bold),
+                  h2: TextStyle(color: const Color(0xFF6366F1), fontSize: 20.sp, fontWeight: FontWeight.bold),
+                  strong: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  blockquote: TextStyle(
+                    color: Colors.white70, 
+                    fontStyle: FontStyle.italic,
+                    decoration: TextDecoration.none,
+                  ),
+                  code: TextStyle(
+                    color: const Color(0xFF6366F1), 
+                    backgroundColor: Colors.black26, 
+                    fontFamily: 'monospace'
+                  ),
+                ),
+              ),
             ),
-            child: Center(child: Icon(Icons.image, size: 60.sp, color: Colors.white24)),
-          ),
-          SizedBox(height: 24.h),
-          Text(
-            controller.item.fullContent,
-            style: TextStyle(color: Colors.white70, fontSize: 16.sp, height: 1.5),
-          ),
-        ],
-      );
-    }
-
-    // Default Text / Markdown view
-    // Using simple Text for now if markdown package missing, but formatted styles
-    return Container(
-      padding: EdgeInsets.all(20.w),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16.r),
-      ),
-      child: MarkdownBody(
-        data: controller.item.fullContent,
-        styleSheet: MarkdownStyleSheet(
-          p: TextStyle(color: Colors.white, fontSize: 16.sp, height: 1.6),
-          h1: TextStyle(color: Colors.white, fontSize: 24.sp, fontWeight: FontWeight.bold),
-          h2: TextStyle(color: AppTheme.accentColor, fontSize: 20.sp, fontWeight: FontWeight.bold),
-          strong: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          blockquote: TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
-          code: TextStyle(color: AppTheme.accentColor, backgroundColor: Colors.black26, fontFamily: 'monospace'),
-          listBullet: TextStyle(color: AppTheme.accentColor),
+            SizedBox(height: 40.h),
+          ],
         ),
       ),
     );
