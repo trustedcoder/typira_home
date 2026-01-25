@@ -1,12 +1,13 @@
 from app import db
-from app.models.insights import UserInsight
+from app.models.insights import UserInsight, UserActivityHistory
+import datetime
 
 def increment_user_stats(user_id, minutes=0, words=0, focus=None, 
                          mood=None, mood_emoji=None, mood_color=None,
                          stress=None, stress_conclusion=None, stress_emoji=None, stress_color=None,
                          energy=None, energy_conclusion=None, energy_emoji=None, energy_color=None,
                          tone=None, tone_conclusion=None, tone_emoji=None, tone_color=None,
-                         sentiment=None):
+                         sentiment=None, interaction_mode=None):
     """
     Increments time saved and words polished for a user.
     Updates full bio-digital metadata suite (mood, stress, energy, tone, sentiment, focus) if provided.
@@ -20,9 +21,11 @@ def increment_user_stats(user_id, minutes=0, words=0, focus=None,
     if not insight:
         insight = UserInsight(user_id=user_id)
         db.session.add(insight)
+        db.session.commit()
+        db.session.flush()
         
-    insight.time_saved_minutes += minutes
-    insight.words_polished += words
+    insight.time_saved_minutes = (insight.time_saved_minutes or 0) + minutes
+    insight.words_polished = (insight.words_polished or 0) + words
     
     # 1. Update Mood
     if mood:
@@ -67,6 +70,26 @@ def increment_user_stats(user_id, minutes=0, words=0, focus=None,
         insight.focus_score = focus
     if sentiment is not None:
         insight.sentiment = sentiment
+        
+    # 6. Update Interaction Mode counts
+    if interaction_mode:
+        mode = interaction_mode.lower()
+        if mode == 'vision':
+            insight.vision_count = (insight.vision_count or 0) + 1
+        elif mode == 'voice':
+            insight.voice_count = (insight.voice_count or 0) + 1
+        elif mode == 'text':
+            insight.text_count = (insight.text_count or 0) + 1
+
+    # 7. Update Daily Activity History
+    if minutes > 0:
+        today = datetime.date.today()
+        history = UserActivityHistory.query.filter_by(user_id=user_id, date=today).first()
+        if not history:
+            history = UserActivityHistory(user_id=user_id, date=today, time_saved_minutes=minutes)
+            db.session.add(history)
+        else:
+            history.time_saved_minutes = (history.time_saved_minutes or 0) + minutes
     
     db.session.commit()
     print(f"📊 Rich Bio-Insights updated for user {user_id}: +{minutes}m, +{words}w, Mood: {mood}, Stress: {stress}, Energy: {energy}, Tone: {tone}")

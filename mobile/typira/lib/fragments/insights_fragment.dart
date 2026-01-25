@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:get/get.dart';
 import '../controllers/insights_controller.dart';
 import '../constants/app_theme.dart';
+import '../utils/color_utils.dart';
 
 class InsightsFragment extends StatelessWidget {
   const InsightsFragment({super.key});
@@ -85,18 +86,20 @@ class InsightsFragment extends StatelessWidget {
                           child: _buildBioCard(
                               "Current Mood",
                               controller.currentMood.value,
-                              Icons.emoji_emotions,
-                              Colors.amber,
-                              subtitle: "Positive Sentiment"),
+                              null,
+                              ColorUtils.fromHex(controller.moodColor.value),
+                              emoji: controller.moodEmoji.value,
+                              subtitle: "${controller.sentiment.value} Sentiment"),
                         ),
                         SizedBox(width: 16.w),
                         Expanded(
                           child: _buildBioCard(
                               "Stress Level",
                               "${controller.stressLevel.value}%",
-                              Icons.speed,
-                              Colors.lightBlueAccent,
-                              subtitle: "Optimal Flow"),
+                              null,
+                              ColorUtils.fromHex(controller.stressColor.value),
+                              emoji: controller.stressEmoji.value,
+                              subtitle: controller.stressConclusion.value),
                         ),
                       ],
                     ),
@@ -107,18 +110,20 @@ class InsightsFragment extends StatelessWidget {
                           child: _buildBioCard(
                               "Energy Level",
                               controller.energyLevel.value,
-                              Icons.bolt,
-                              Colors.orangeAccent,
-                              subtitle: "Typing Bursts"),
+                              null,
+                              ColorUtils.fromHex(controller.energyColor.value),
+                              emoji: controller.energyEmoji.value,
+                              subtitle: controller.energyConclusion.value),
                         ),
                         SizedBox(width: 16.w),
                         Expanded(
                           child: _buildBioCard(
                               "Tone Profile",
                               controller.toneProfile.value,
-                              Icons.translate,
-                              Colors.purpleAccent,
-                              subtitle: "Vocabulary Analysis"),
+                              null,
+                              ColorUtils.fromHex(controller.toneColor.value),
+                              emoji: controller.toneEmoji.value,
+                              subtitle: controller.toneConclusion.value),
                         ),
                       ],
                     ),
@@ -281,7 +286,7 @@ class InsightsFragment extends StatelessWidget {
     );
   }
 
-  Widget _buildBioCard(String title, String value, IconData icon, Color color, {String subtitle = ""}) {
+  Widget _buildBioCard(String title, String value, IconData? icon, Color color, {String subtitle = "", String? emoji}) {
     return Container(
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
@@ -300,7 +305,9 @@ class InsightsFragment extends StatelessWidget {
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle
                 ),
-                child: Icon(icon, color: color, size: 20.sp),
+                child: emoji != null 
+                  ? Text(emoji, style: TextStyle(fontSize: 20.sp))
+                  : Icon(icon, color: color, size: 20.sp),
               ),
               Spacer(),
               Icon(Icons.more_horiz, color: Colors.white24, size: 20.sp),

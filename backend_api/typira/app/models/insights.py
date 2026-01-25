@@ -37,7 +37,27 @@ class UserInsight(db.Model):
     sentiment = db.Column(db.String(20), default="Neutral")
     
     health_score = db.Column(db.Integer, default=90)
+    
+    # Interaction Mode Counters
+    vision_count = db.Column(db.Integer, default=0)
+    voice_count = db.Column(db.Integer, default=0)
+    text_count = db.Column(db.Integer, default=0)
+    
     last_updated = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     def __repr__(self):
         return f"<UserInsight for user '{self.user_id}'>"
+
+class UserActivityHistory(db.Model):
+    __tablename__ = "user_activity_history"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    date = db.Column(db.Date, default=datetime.date.today)
+    time_saved_minutes = db.Column(db.Integer, default=0)
+
+    # Ensure one record per user per day
+    __table_args__ = (db.UniqueConstraint('user_id', 'date', name='uix_user_date'),)
+
+    def __repr__(self):
+        return f"<UserActivityHistory user='{self.user_id}' date='{self.date}' time='{self.time_saved_minutes}'>"

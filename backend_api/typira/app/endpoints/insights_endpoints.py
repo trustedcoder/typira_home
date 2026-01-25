@@ -2,7 +2,8 @@ from flask import request
 from flask_restx import Resource
 from app.util.insights_dto import InsightsDto
 from app.helpers.auth_helpers import token_required
-from app.models.insights import UserInsight
+from app.models.insights import UserInsight, UserActivityHistory
+import datetime
 from app import db
 
 ns = InsightsDto.api
@@ -19,27 +20,37 @@ class InsightsStats(Resource):
         user_id = current_user.id
         insight = UserInsight.query.filter_by(user_id=user_id).first()
         
-        # If no insight record exists yet, return default initial values
+        # If no insight record exists yet, create one with defaults
         if not insight:
-            return {
-                'status': 1,
-                'data': {
-                    'timeSavedMinutes': 0,
-                    'wordsPolished': 0,
-                    'focusScore': 85,
-                    'currentMood': "Steady",
-                    'stressLevel': 20,
-                    'healthScore': 90,
-                    'energyLevel': "Stable",
-                    'toneProfile': "Neutral",
-                    'activityData': [],
-                    'interactionModeData': [
-                        {'label': 'Vision', 'value': 0, 'color': '0xFF00E5FF'},
-                        {'label': 'Voice', 'value': 0, 'color': '0xFFD500F9'},
-                        {'label': 'Text', 'value': 0, 'color': '0xFF2979FF'}
-                    ]
-                }
-            }, 200
+            insight = UserInsight(user_id=user_id)
+            db.session.add(insight)
+            db.session.commit()
+            # We continue with the newly created insight object and empty/default data
+
+        # Calculate interaction mode data percentages
+        total_interactions = insight.vision_count + insight.voice_count + insight.text_count
+        if total_interactions > 0:
+            vision_pct = (insight.vision_count / total_interactions) * 100
+            voice_pct = (insight.voice_count / total_interactions) * 100
+            text_pct = (insight.text_count / total_interactions) * 100
+        else:
+            vision_pct, voice_pct, text_pct = 0, 0, 0
+
+        # Fetch last 7 days of activity history
+        today = datetime.date.today()
+        seven_days_ago = today - datetime.timedelta(days=6)
+        history_records = UserActivityHistory.query.filter(
+            UserActivityHistory.user_id == user_id,
+            UserActivityHistory.date >= seven_days_ago
+        ).order_by(UserActivityHistory.date.asc()).all()
+
+        # Map history to activityData (x=0 to 6)
+        history_map = {record.date: record.time_saved_minutes for record in history_records}
+        activity_data = []
+        for i in range(7):
+            date = seven_days_ago + datetime.timedelta(days=i)
+            minutes = history_map.get(date, 0)
+            activity_data.append({'x': i, 'y': minutes})
 
         return {
             'status': 1,
@@ -52,25 +63,23 @@ class InsightsStats(Resource):
                 'healthScore': insight.health_score,
                 'energyLevel': insight.energy_level,
                 'toneProfile': insight.tone_profile,
-                # For activityData and interactionModeData, we still use mock/empty structure for now
-                # until we implement the logging for those specific metrics.
-                'activityData': [
-                    {'x': 0, 'y': 3},
-                    {'x': 1, 'y': 4},
-                    {'x': 2, 'y': 3.5},
-                    {'x': 3, 'y': 5},
-                    {'x': 4, 'y': 8},
-                    {'x': 5, 'y': 6},
-                    {'x': 6, 'y': 7}
-                ] if insight.time_saved_minutes > 0 else [],
+                'sentiment': insight.sentiment,
+                'moodEmoji': insight.mood_emoji or "😊",
+                'moodColor': insight.mood_color or "#FFC107",
+                'stressEmoji': insight.stress_emoji or "😌",
+                'stressConclusion': insight.stress_conclusion or "Optimal Flow",
+                'stressColor': insight.stress_color or "#40C4FF",
+                'energyEmoji': insight.energy_emoji or "⚡️",
+                'energyConclusion': insight.energy_conclusion or "Typing Bursts",
+                'energyColor': insight.energy_color or "#FFAB40",
+                'toneEmoji': insight.tone_emoji or "🗣️",
+                'toneConclusion': insight.tone_conclusion or "Vocabulary Analysis",
+                'toneColor': insight.tone_color or "#D500F9",
+                'activityData': activity_data,
                 'interactionModeData': [
-                    {'label': 'Vision', 'value': 40, 'color': '0xFF00E5FF'},
-                    {'label': 'Voice', 'value': 35, 'color': '0xFFD500F9'},
-                    {'label': 'Text', 'value': 25, 'color': '0xFF2979FF'}
-                ] if insight.time_saved_minutes > 0 else [
-                    {'label': 'Vision', 'value': 0, 'color': '0xFF00E5FF'},
-                    {'label': 'Voice', 'value': 0, 'color': '0xFFD500F9'},
-                    {'label': 'Text', 'value': 0, 'color': '0xFF2979FF'}
+                    {'label': 'Vision', 'value': round(vision_pct, 1), 'color': '#00E5FF'},
+                    {'label': 'Voice', 'value': round(voice_pct, 1), 'color': '#D500F9'},
+                    {'label': 'Text', 'value': round(text_pct, 1), 'color': '#2979FF'}
                 ]
             }
         }, 200

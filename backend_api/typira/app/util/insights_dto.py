@@ -23,6 +23,18 @@ class InsightsDto:
         'healthScore': fields.Integer(description='Health score (0-100)'),
         'energyLevel': fields.String(description='Energy level'),
         'toneProfile': fields.String(description='Tone profile'),
+        'sentiment': fields.String(description='Categorical sentiment (positive/negative/neutral)'),
+        'moodEmoji': fields.String(description='Current mood emoji'),
+        'moodColor': fields.String(description='Current mood hex color'),
+        'stressEmoji': fields.String(description='Stress emoji'),
+        'stressConclusion': fields.String(description='Stress conclusion'),
+        'stressColor': fields.String(description='Stress hex color'),
+        'energyEmoji': fields.String(description='Energy emoji'),
+        'energyConclusion': fields.String(description='Energy conclusion'),
+        'energyColor': fields.String(description='Energy hex color'),
+        'toneEmoji': fields.String(description='Tone emoji'),
+        'toneConclusion': fields.String(description='Tone conclusion'),
+        'toneColor': fields.String(description='Tone hex color'),
         'activityData': fields.List(fields.Nested(activity_spot)),
         'interactionModeData': fields.List(fields.Nested(interaction_slice))
     })
