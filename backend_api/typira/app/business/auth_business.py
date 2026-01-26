@@ -14,15 +14,20 @@ class AuthBusiness:
             }
             return response_object, 409
 
+        from app.helpers.notification_method import NotificationMethod
         new_user = User(
             email=data['email'],
             password=User.generate_password(data['password']),
             public_id=str(uuid.uuid4()),
-            name=data['name'],
-            fcm_token=data['fcm_token'],
+            name=data['name']
         )
         db.session.add(new_user)
         db.session.commit()
+
+        # Save FCM Token if provided
+        fcm_token = data.get('fcm_token')
+        if fcm_token:
+            NotificationMethod.save_fcm_token(new_user.id, fcm_token)
 
         response_object = AuthBusiness.login_user(data)
         return response_object
@@ -30,13 +35,17 @@ class AuthBusiness:
     @staticmethod
     def login_user(data):
         try:
+            from app.helpers.notification_method import NotificationMethod
             # fetch the user data
             user = User.query.filter(User.email == data['email']).first()
             if user and User.check_password(user.password, data['password']):
                 auth_response = user.encode_auth_token(user.public_id)
                 if auth_response['status'] == 1:
-                    user.fcm_token = data['fcm_token']
-                    db.session.commit()
+                    # Update FCM Token if provided
+                    fcm_token = data.get('fcm_token')
+                    if fcm_token:
+                        NotificationMethod.save_fcm_token(user.id, fcm_token)
+
                     response_object = {
                         'status': 1,
                         'public_id': user.public_id,

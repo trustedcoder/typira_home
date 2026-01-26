@@ -109,3 +109,58 @@ class UserActionList(Resource):
             'has_next': pagination.has_next,
             'has_prev': pagination.has_prev
         }
+@api.route('/<string:id>')
+@api.param('id', 'The prefixed identifier (mem_, type_, act_)')
+class MemoryResource(Resource):
+    @api.doc('get_memory_detail')
+    @api.marshal_with(_memory_item)
+    @token_required
+    def get(self, id, current_user, *args, **kwargs):
+        """Get details of a specific memory, typing history or user action"""
+        parts = id.split('_')
+        if len(parts) < 2:
+            api.abort(400, "Invalid ID format")
+        
+        prefix = parts[0]
+        try:
+            real_id = int(parts[1])
+        except ValueError:
+            api.abort(400, "Invalid ID numeric part")
+
+        if prefix == 'mem':
+            item = Memory.query.filter_by(id=real_id, user_id=current_user.id).first()
+            if not item: api.abort(404, "Memory not found")
+            return {
+                'id': id,
+                'title': item.tags if item.tags else "Memory",
+                'content': item.content,
+                'icon': "🧠",
+                'time_ago': get_time_ago(item.timestamp),
+                'timestamp': item.timestamp
+            }
+        elif prefix == 'type':
+            item = TypingHistory.query.filter_by(id=real_id, user_id=current_user.id).first()
+            if not item: api.abort(404, "History not found")
+            return {
+                'id': id,
+                'title': item.app_context if item.app_context else "Typing History",
+                'content': item.content,
+                'icon': "⌨️",
+                'time_ago': get_time_ago(item.timestamp),
+                'timestamp': item.timestamp
+            }
+        elif prefix == 'act':
+            item = UserAction.query.filter_by(id=real_id, user_id=current_user.id).first()
+            if not item: api.abort(404, "Action not found")
+            icon = "✅" if item.decision == 'approved' else "❌"
+            title = "Action Approved" if item.decision == 'approved' else "Action Declined"
+            return {
+                'id': id,
+                'title': title,
+                'content': item.context if item.context else item.action_id,
+                'icon': icon,
+                'time_ago': get_time_ago(item.timestamp),
+                'timestamp': item.timestamp
+            }
+        else:
+            api.abort(400, "Unknown prefix")

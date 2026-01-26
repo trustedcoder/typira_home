@@ -6,8 +6,8 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   // static const String baseUrl = "http://172.20.10.7:7009/api";
   // static const String socketUrl = "http://172.20.10.7:7009";
-  static const String baseUrl = "http://192.168.1.186:7009/api";
-  static const String socketUrl = "http://192.168.1.186:7009";
+  static const String baseUrl = "http://192.168.0.181:7009/api";
+  static const String socketUrl = "http://192.168.0.181:7009";
   static const String login = "$baseUrl/auth/login";
   static const String register = "$baseUrl/auth/register";
   static const String getUser = "$baseUrl/user/me";
@@ -15,6 +15,7 @@ class AppConfig {
   static const String getMemories = "$baseUrl/memory/memories";
   static const String getTypingHistory = "$baseUrl/memory/typing-history";
   static const String getUserActions = "$baseUrl/memory/user-actions";
+  static const String scheduler = "$baseUrl/scheduler/";
 
 
 

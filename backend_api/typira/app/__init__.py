@@ -5,6 +5,7 @@ from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from flask.cli import FlaskGroup
 from flask_socketio import SocketIO
+from apscheduler.schedulers.background import BackgroundScheduler
 
 
 db = SQLAlchemy()
@@ -12,6 +13,7 @@ flask_bcrypt = Bcrypt()
 cors = CORS()
 flask_cli = FlaskGroup()
 socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
+scheduler = BackgroundScheduler()
 
 
 def create_app(config_name):
@@ -28,5 +30,11 @@ def create_app(config_name):
 
     with app.app_context():
         from app import socket_endpoints
+        from app.business.scheduler_business import dispatch_due_schedules
+        
+        # Start Scheduler
+        if not scheduler.running:
+            scheduler.add_job(func=dispatch_due_schedules, trigger="interval", minutes=1)
+            scheduler.start()
 
     return app

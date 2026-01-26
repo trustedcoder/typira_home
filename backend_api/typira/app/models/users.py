@@ -14,7 +14,7 @@ class User(db.Model):
     password = db.Column(db.String(225), nullable=True)
     is_email_verified = db.Column(db.Boolean, default=False)
     name = db.Column(db.String(225), nullable=True)
-    fcm_token = db.Column(db.Text, nullable=True)
+    fcm_tokens = db.relationship('FCMTokens', back_populates='user', lazy=True)
 
     def __repr__(self):
         return "{}".format(self.email)

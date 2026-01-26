@@ -4,6 +4,7 @@ flask-restx
 Flask-SQLAlchemy
 flask-cors
 flask-bcrypt
+firebase_admin
 python-dotenv
 PyMySQL
 PyJWT

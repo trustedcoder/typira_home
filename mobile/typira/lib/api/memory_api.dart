@@ -26,6 +26,21 @@ class MemoryApi {
     return _fetchPaginated(AppConfig.getUserActions, page, perPage);
   }
 
+  Future<dynamic> getMemoryDetail(String id) async {
+    final uri = Uri.parse("${AppConfig.getMemories}/$id");
+    final request = http.Request('GET', uri)
+      ..headers['Content-Type'] = 'application/json';
+
+    try {
+      final response = await _client.send(request);
+      final responseBody = await response.stream.bytesToString();
+      return json.decode(responseBody);
+    } catch (exception) {
+      print(exception.toString());
+      return Future.error(exception.toString());
+    }
+  }
+
   Future<dynamic> _fetchPaginated(String url, int page, int perPage) async {
     final uri = Uri.parse(url).replace(queryParameters: {
       'page': page.toString(),

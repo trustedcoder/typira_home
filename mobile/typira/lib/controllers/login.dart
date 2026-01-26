@@ -5,6 +5,7 @@ import '../api/authentication.dart';
 import '../helpers/alert_dialog.dart';
 import '../helpers/progressmodal.dart';
 import '../storage/session_manager.dart';
+import '../services/notification.dart';
 
 class LoginController extends GetxController {
   final authenticationApi = Authentication();
@@ -28,9 +29,11 @@ class LoginController extends GetxController {
     ProgressDialog progressDialog = ProgressDialog(message: "Please wait...");
     Get.dialog(progressDialog, barrierDismissible: false);
     try {
+      String? fcmToken = await NotificationService.getFcmToken();
       authenticationApi.login(
           email: email,
-          password: password)
+          password: password,
+          fcm_token: fcmToken)
           .then((resp) {
         Get.back();
         print(resp);
@@ -41,6 +44,7 @@ class LoginController extends GetxController {
           Get.offAllNamed("/home");
         }
         else {
+          print(resp['message']);
           AlertDialogCustom.show(Get.context!, "Alert!", resp['message'], "OK");
         }
       }, onError: (err) {

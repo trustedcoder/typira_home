@@ -12,6 +12,10 @@ import 'activities/login_activity.dart';
 import 'activities/register_activity.dart';
 import 'activities/splash_activity.dart';
 import 'activities/home_activity.dart';
+import 'activities/settings_activity.dart';
+import 'activities/scheduler_activity.dart';
+import 'activities/schedule_edit_activity.dart';
+import 'activities/memory_detail_activity.dart';
 import 'constants/app_theme.dart';
 import 'controllers/life_cycle.dart';
 
@@ -90,6 +94,30 @@ class MyApp extends StatelessWidget {
           name: '/home',
           page: () => const HomeActivity(),
           transition: Transition.fadeIn,
+          curve: Curves.easeInOut,
+        ),
+        GetPage(
+          name: '/settings',
+          page: () => const SettingsActivity(),
+          transition: Transition.rightToLeft,
+          curve: Curves.easeInOut,
+        ),
+        GetPage(
+          name: '/scheduler',
+          page: () => const SchedulerActivity(),
+          transition: Transition.rightToLeft,
+          curve: Curves.easeInOut,
+        ),
+        GetPage(
+          name: '/schedule_edit',
+          page: () => const ScheduleEditActivity(),
+          transition: Transition.downToUp,
+          curve: Curves.easeInOut,
+        ),
+        GetPage(
+          name: '/memory-detail',
+          page: () => const MemoryDetailActivity(),
+          transition: Transition.rightToLeft,
           curve: Curves.easeInOut,
         ),
       ],

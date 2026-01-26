@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -10,9 +11,16 @@ import 'logger.dart';
 class AppHelper{
   /// This method is called when the user clicks on the local notification
   static void onMessageNotificationClicked(String payload) {
-    logger.i("Notification clicked");
-    // Navigate to a specific screen or handle the payload
-    debugPrint('notification payload: $payload');
+    logger.i("Notification clicked with payload: $payload");
+    try {
+      final Map<String, dynamic> data = json.decode(payload);
+      if (data.containsKey('memory_id')) {
+        String memoryId = data['memory_id'];
+        Get.toNamed('/memory-detail', arguments: memoryId);
+      }
+    } catch (e) {
+      logger.e("Error parsing notification payload: $e");
+    }
   }
 
   /// This method is use to clear all states and return to the dashboard

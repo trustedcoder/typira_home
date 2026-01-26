@@ -390,3 +390,37 @@ MY INPUT TEXT: "{text}"
 
 {output_constraints}
 - BE INSIGHTFUL."""
+JSON_FORMAT_SCHEDULED = """OUTPUT FORMAT (Strict JSON):
+{{
+  "title": "Short title for the insight (e.g., 'Morning Activity Update')",
+  "short_description": "2-sentence summary for the push notification body.",
+  "full_formatted_result": "Detailed, markdown-formatted full findings to be stored in my memory."
+}}"""
+
+SCHEDULED_INSIGHT_PROMPT_TEMPLATE = """{base_persona} This is a SCHEDULED moment for an insight.
+{time_context}
+{standard_context_block}
+
+SCHEDULED ACTION: "{action_description}"
+
+INSTRUCTIONS:
+1. If the 'SCHEDULED ACTION' is provided, perform it with high precision.
+2. If it is empty, find the most important or insightful thing to tell me right now. This can include:
+   - Personalized news or happenings related to my history/memories.
+   - Weather updates if relevant to my plans.
+   - Significant life events or anniversaries from my memory.
+   - A synthesis of my typing history to reveal a pattern or reminder.
+3. USE GOOGLE SEARCH to gather real-time data if needed (news, weather, events).
+4. Relate EVERYTHING to ME personally. Why does this matter given my history or memories?
+
+{multi_step_thought_process}
+- Fourth, provide your final response in the specified JSON format.
+
+4. Return a 'title' for this insight (short, 3-4 words).
+5. Return a 'short_description' (2 sentences max) for my notification tray.
+6. Return a 'full_formatted_result' in MARKDOWN. This should be deep, well-structured, and highly personal.
+
+7. {json_format}
+
+{output_constraints}
+- BE INSIGHTFUL and PERSONAL."""

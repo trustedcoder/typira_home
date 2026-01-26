@@ -14,11 +14,11 @@ class Authentication {
     },
   );
 
-  Future<dynamic> login({required String email, required String password}) async {
+  Future<dynamic> login({required String email, required String password, String? fcm_token}) async {
     final payload = {
       "email": email,
       "password": password,
-      "fcm_token": "password"
+      "fcm_token": fcm_token
     };
 
     final request = http.Request('POST', Uri.parse(AppConfig.login))
@@ -28,6 +28,7 @@ class Authentication {
     try {
       final response = await _client.send(request);
       final responseBody = await response.stream.bytesToString();
+      print(responseBody);
       if (response.statusCode != 200) {
         return json.decode(responseBody);
       } else {
@@ -39,7 +40,7 @@ class Authentication {
     }
   }
 
-  Future<dynamic> register({required String name,required String email, required String fcm_token, required String password}) async {
+  Future<dynamic> register({required String name,required String email, String? fcm_token, required String password}) async {
     final payload = {
       "email": email,
       "password": password,

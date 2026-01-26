@@ -4,7 +4,7 @@ import traceback
 import base64
 from google import genai
 from google.genai import types
-from app.business.prompts import BASE_PERSONA, KEYBOARD_PERSONA, INSIGHTS_SCHEMA,OUTPUT_CONSTRAINTS, PRIORITY_TASK_GUIDELINES, STANDARD_CONTEXT_BLOCK, MULTI_STEP_THOUGHT_PROCESS, KEYBOARD_ACTION_DEFINITIONS, AGENTIC_ACTION_DEFINITIONS, KEYBOARD_CONTEXT_BLOCK, KEYBOARD_THOUGHT_PROCESS, KEYBOARD_INSTRUCTIONS, PROACTIVE_ACTIONS_INSTRUCTION, JSON_FORMAT_KEYBOARD_CONTEXT, JSON_FORMAT_INSIGHT, JSON_FORMAT_VOICE, JSON_FORMAT_EXECUTION, PRIORITY_TASK_GOAL, PRIORITY_TASK_EXECUTION_STEPS, AGENTIC_ACTION_PROMPT_TEMPLATE, AGENTIC_EXECUTION_PROMPT_TEMPLATE, AGENTIC_EXECUTION_INSTRUCTIONS, AGENTIC_EXECUTION_CONSTRAINTS_BLOCK, IMAGE_ANALYSIS_PROMPT_TEMPLATE, IMAGE_ANALYSIS_INSTRUCTIONS, VOICE_ANALYSIS_PROMPT_TEMPLATE, VOICE_ANALYSIS_INSTRUCTIONS, TEXT_ANALYSIS_PROMPT_TEMPLATE, TEXT_ANALYSIS_INSTRUCTIONS
+from app.business.prompts import BASE_PERSONA, KEYBOARD_PERSONA, INSIGHTS_SCHEMA,OUTPUT_CONSTRAINTS, PRIORITY_TASK_GUIDELINES, STANDARD_CONTEXT_BLOCK, MULTI_STEP_THOUGHT_PROCESS, KEYBOARD_ACTION_DEFINITIONS, AGENTIC_ACTION_DEFINITIONS, KEYBOARD_CONTEXT_BLOCK, KEYBOARD_THOUGHT_PROCESS, KEYBOARD_INSTRUCTIONS, PROACTIVE_ACTIONS_INSTRUCTION, JSON_FORMAT_KEYBOARD_CONTEXT, JSON_FORMAT_INSIGHT, JSON_FORMAT_VOICE, JSON_FORMAT_EXECUTION, PRIORITY_TASK_GOAL, PRIORITY_TASK_EXECUTION_STEPS, AGENTIC_ACTION_PROMPT_TEMPLATE, AGENTIC_EXECUTION_PROMPT_TEMPLATE, AGENTIC_EXECUTION_INSTRUCTIONS, AGENTIC_EXECUTION_CONSTRAINTS_BLOCK, IMAGE_ANALYSIS_PROMPT_TEMPLATE, IMAGE_ANALYSIS_INSTRUCTIONS, VOICE_ANALYSIS_PROMPT_TEMPLATE, VOICE_ANALYSIS_INSTRUCTIONS, TEXT_ANALYSIS_PROMPT_TEMPLATE, TEXT_ANALYSIS_INSTRUCTIONS, JSON_FORMAT_SCHEDULED, SCHEDULED_INSIGHT_PROMPT_TEMPLATE
 
 class GeminiBusiness:
     # Initialize Gemini
@@ -447,4 +447,47 @@ Sentence:"""
                 "title": "Text Error",
                 "plan": "I'm having trouble analyzing your request right now.",
                 "actions": [{"id": "none", "label": "Ok", "type": "none", "payload": ""}]
+            }
+    @staticmethod
+    def generate_scheduled_insight(action_description: str, history: list, memories: list, action_history: list, current_time: str = None, user_platform: str = None):
+        """
+        Generates a personalized insight for a scheduled moment, using Google Search grounding.
+        Returns: {title, short_description, full_formatted_result}
+        """
+        try:
+            history_block = "\n".join([f"- {h}" for h in history])
+            memory_block = "\n".join([f"- {m}" for m in memories])
+            action_block = "\n".join([f"- {a}" for a in action_history])
+            time_context = f"CURRENT TIME: {current_time}\n" if current_time else ""
+
+            prompt = SCHEDULED_INSIGHT_PROMPT_TEMPLATE.format(
+                base_persona=BASE_PERSONA,
+                time_context=time_context,
+                standard_context_block=STANDARD_CONTEXT_BLOCK.format(history_block=history_block, memory_block=memory_block, action_block=action_block, user_platform=user_platform or "unknown"),
+                action_description=action_description or "None provided. Find an insightful thing about me.",
+                multi_step_thought_process=MULTI_STEP_THOUGHT_PROCESS,
+                json_format=JSON_FORMAT_SCHEDULED,
+                output_constraints=OUTPUT_CONSTRAINTS
+            )
+
+            response = GeminiBusiness.client.models.generate_content(
+                model=GeminiBusiness.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                    tools=[types.Tool(google_search_retrieval=types.GoogleSearchRetrieval())]
+                )
+            )
+            import json
+            if not response.text:
+                raise Exception("Empty response from AI or blocked by safety filters.")
+            return json.loads(response.text)
+
+        except Exception as e:
+            print(f"Scheduled Insight Error: {e}")
+            print(traceback.format_exc())
+            return {
+                "title": "Scheduled Helper",
+                "short_description": "I noticed it's time for your scheduled update!",
+                "full_formatted_result": "I'm having trouble connecting to my live search brain right now, but I haven't forgotten about your schedule. I'll check back soon!"
             }

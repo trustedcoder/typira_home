@@ -135,13 +135,12 @@ class HomeActivity extends StatelessWidget {
             ),
           ],
         ),
-        // IconButton(
-        //   onPressed: () {
-        //     // Toggle offline mode for demo
-        //     controller.isOffline.value = !controller.isOffline.value;
-        //   },
-        //   icon: Icon(Icons.settings, color: Colors.white54)
-        // )
+        IconButton(
+          onPressed: () {
+            Get.toNamed("/settings");
+          },
+          icon: const Icon(Icons.settings, color: Colors.white54)
+        )
       ],
     );
   }

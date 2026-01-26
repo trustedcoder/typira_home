@@ -5,6 +5,7 @@ import '../api/authentication.dart';
 import '../helpers/alert_dialog.dart';
 import '../helpers/progressmodal.dart';
 import '../storage/session_manager.dart';
+import '../services/notification.dart';
 
 class RegisterController extends GetxController {
   final authenticationApi = Authentication();
@@ -27,7 +28,7 @@ class RegisterController extends GetxController {
     super.onClose();
   }
 
-  Future<void> registerUser({required String name,required String email, required String fcm_token, required String password}) async {
+  Future<void> registerUser({required String name,required String email, String? fcm_token, required String password}) async {
     ProgressDialog progressDialog = ProgressDialog(message: "Please wait...");
     Get.dialog(progressDialog, barrierDismissible: false);
     try {
@@ -61,10 +62,10 @@ class RegisterController extends GetxController {
     }
   }
 
-  void register() {
+  void register() async {
     final name = nameController.text;
     final email = emailController.text;
-    final fcm_token = "temporary_token";
+    String? fcm_token = await NotificationService.getFcmToken();
     final password = passwordController.text;
     final passwordConfirmation = passwordConfirmationController.text;
 
