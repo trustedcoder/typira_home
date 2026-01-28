@@ -34,7 +34,7 @@ def create_app(config_name):
         
         # Start Scheduler
         if not scheduler.running:
-            scheduler.add_job(func=dispatch_due_schedules, trigger="interval", minutes=1)
+            scheduler.add_job(func=dispatch_due_schedules, trigger="interval", minutes=1, args=[app])
             scheduler.start()
 
     return app

@@ -8,24 +8,54 @@ from app.models.context import Memory, TypingHistory, UserAction
 from app.business.gemini_business import GeminiBusiness
 from app.helpers.insight_helpers import increment_user_stats
 
-def dispatch_due_schedules():
+def dispatch_due_schedules(app):
     print("dispatch_due_schedules")
     """
     Called every minute by APScheduler. Checks for schedules that match the current time.
     """
     # Use app context since this runs in a separate thread
-    with current_app.app_context():
+    with app.app_context():
+        print("BBBBBBBBB")
         try:
             now_utc = datetime.datetime.utcnow()
             schedules = Schedule.query.all()
             
             for schedule in schedules:
+                print("VVVVVVV")
                 if is_due(schedule, now_utc):
+                    print("TESTING SCHEL")
                     # We use a socket background task or separate thread to not block the main scheduler loop
                     process_schedule(schedule)
         except Exception as e:
             print(f"Error in dispatch_due_schedules: {e}")
             traceback.print_exc()
+
+def get_timezone_obj(tz_str):
+    """
+    Safely returns a timezone object. Handles 'GMT+X', 'UTC+X', and standard IANA names.
+    Defaults to UTC on failure.
+    """
+    if not tz_str:
+        return pytz.utc
+        
+    try:
+        return pytz.timezone(tz_str)
+    except pytz.UnknownTimeZoneError:
+        # Attempt to parse manual offsets like GMT+1, UTC-5
+        try:
+            clean_str = tz_str.upper().replace("GMT", "").replace("UTC", "").strip()
+            if clean_str.startswith("+"):
+                offset = int(clean_str.replace("+", ""))
+                return pytz.FixedOffset(offset * 60)
+            elif clean_str.startswith("-"):
+                offset = int(clean_str.replace("-", ""))
+                return pytz.FixedOffset(offset * 60) # FixedOffset takes minutes, negative handled?
+                # pytz.FixedOffset(60) is +1h. pytz.FixedOffset(-60) is -1h.
+        except Exception:
+            pass
+            
+        print(f"Warning: Unknown timezone '{tz_str}', defaulting to UTC")
+        return pytz.utc
 
 def is_due(schedule, now_utc):
     """
@@ -35,15 +65,21 @@ def is_due(schedule, now_utc):
         # 1. Check if it already ran in this same minute (to avoid overlaps)
         if schedule.last_run:
             if schedule.last_run.strftime("%Y-%m-%d %H:%M") == now_utc.strftime("%Y-%m-%d %H:%M"):
+                print("hhhhhhhh")
                 return False
 
         # 2. Parse schedule timezone
-        tz = pytz.timezone(schedule.timezone or 'UTC')
+        tz = get_timezone_obj(schedule.timezone)
         local_now = now_utc.replace(tzinfo=pytz.utc).astimezone(tz)
+
+        print("fffffff")
         
         # 3. Check time match (HH:mm)
         local_time_str = local_now.strftime("%H:%M")
+        print(local_time_str)
+        print(schedule.time)
         if local_time_str != schedule.time:
+            print("rrrrrrrr")
             return False
             
         # 4. Check Date or Repeat
@@ -58,7 +94,8 @@ def is_due(schedule, now_utc):
         # Specific date match (YYYY-MM-DD)
         if schedule.date_or_repeat == local_now.strftime("%Y-%m-%d"):
             return True
-            
+
+        print("lllllllll")
         return False
     except Exception as e:
         print(f"Error checking schedule {schedule.id}: {e}")

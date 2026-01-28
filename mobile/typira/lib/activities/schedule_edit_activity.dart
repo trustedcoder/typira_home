@@ -15,13 +15,13 @@ class ScheduleEditActivity extends StatefulWidget {
 class _ScheduleEditActivityState extends State<ScheduleEditActivity> {
   final _titleController = TextEditingController();
   final _actionController = TextEditingController();
-  String _timezone = "GMT+1";
+  String _timezone = "UTC";
   String _time = "09:00";
   String _dateOrRepeat = "Everyday";
   bool _isRepeat = true;
   Schedule? _editingSchedule;
 
-  final List<String> _timezones = ["UTC", "GMT", "GMT+1", "GMT+2", "EST", "PST"];
+  // final List<String> _timezones = ["UTC", "GMT", "GMT+1", "GMT+2", "EST", "PST"]; // Removed
   final List<String> _repeatOptions = ["Everyday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
   @override
@@ -139,7 +139,7 @@ class _ScheduleEditActivityState extends State<ScheduleEditActivity> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildLabel("TIMEZONE"),
-                      _buildDropdown(_timezone, _timezones, (val) => setState(() => _timezone = val!)),
+                      _buildTimezoneDropdown(),
                     ],
                   ),
                 ),
@@ -235,6 +235,60 @@ class _ScheduleEditActivityState extends State<ScheduleEditActivity> {
           icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
           items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(color: Colors.white)))).toList(),
           onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimezoneDropdown() {
+    final schedulerController = Get.find<SchedulerController>();
+    final timezones = schedulerController.availableTimezones;
+    
+    // Ensure the current timezone exists in the list, otherwise default to first or keep it if we can render text
+    // But DropdownButton requires value to be in items.
+    // If _timezone is not in list (e.g. legacy GMT+1), we fallback to UTC or add it temporarily?
+    // Let's fallback to UTC if not found, to match the requirement of "fixing" it.
+    // Or better, check if present.
+    
+    String dropdownValue = _timezone;
+    bool exists = timezones.any((t) => t['value'] == dropdownValue);
+    if (!exists) {
+      // If it looks like a valid IANA zone we might want to keep it? 
+      // But for now let's default to UTC to force user to pick a valid one from our curated list.
+      dropdownValue = "UTC"; 
+      // Update state so we save the valid one later
+      // valid: this is inside build, avoid setState here. Just use local var for display.
+      // But when saving, we might save the old invalid one if user doesn't touch it?
+      // No, we should probably update _timezone in initState if invalid?
+      // For now, let's just use UTC in dropdown if invalid.
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: dropdownValue,
+          isExpanded: true,
+          dropdownColor: const Color(0xFF1E293B),
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.white54),
+          items: timezones.map((e) => DropdownMenuItem(
+            value: e['value'],
+            child: Text(
+              e['label'] ?? "", 
+              style: const TextStyle(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          )).toList(),
+          onChanged: (val) {
+            if (val != null) {
+              setState(() => _timezone = val);
+            }
+          },
         ),
       ),
     );

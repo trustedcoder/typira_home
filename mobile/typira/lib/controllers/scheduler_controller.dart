@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import '../api/scheduler_api.dart';
+import '../constants/timezones.dart';
 
 class Schedule {
   int? id;
@@ -51,6 +52,9 @@ class SchedulerController extends GetxController {
   final SchedulerApi _schedulerApi = SchedulerApi();
   var schedules = <Schedule>[].obs;
   var isLoading = false.obs;
+  
+  // Expose timezones from constants
+  List<Map<String, String>> get availableTimezones => timezones;
 
   @override
   void onInit() {

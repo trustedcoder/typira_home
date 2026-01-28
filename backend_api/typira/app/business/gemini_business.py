@@ -485,7 +485,6 @@ Sentence:"""
 
         except Exception as e:
             print(f"Scheduled Insight Error: {e}")
-            print(traceback.format_exc())
             return {
                 "title": "Scheduled Helper",
                 "short_description": "I noticed it's time for your scheduled update!",
