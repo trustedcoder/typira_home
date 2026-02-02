@@ -4,6 +4,7 @@ import 'package:typira/storage/session_manager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_settings/app_settings.dart';
 import 'dart:async';
+import '../services/notification.dart';
 import '../services/socket_service.dart';
 import '../api/user_api.dart';
 import '../controllers/home_input.dart';
@@ -39,6 +40,10 @@ class HomeController extends GetxController {
   var dialogueTitle = "Initializing...".obs;
   var dialogueBody = "Connecting to Agent Core...".obs;
   var currentThought = "".obs;
+  var thoughts = <String>[].obs; // Live thoughts for current task
+  var resultThoughts = <String>[].obs; // Frozen thoughts for result view
+  var isThoughtsExpanded = false.obs;
+  var isResultThoughtsExpanded = false.obs;
   var currentActionId = "".obs;
   var dynamicActions = <Map<String, dynamic>>[].obs;
   var lastResult = "".obs;
@@ -57,6 +62,8 @@ class HomeController extends GetxController {
     super.onInit();
     fetchProfile();
     setupSocket();
+    NotificationService.setupFirebaseMessaging();
+    NotificationService.setupLocalNotification();
   }
 
   void fetchProfile() async {
@@ -84,6 +91,12 @@ class HomeController extends GetxController {
         // Request initial priority task once ready
 
         socketService.getPriority();
+
+        thoughts.clear(); // Clear thoughts for new task
+        resultThoughts.clear(); // Clear result thoughts when new task starts
+        isThoughtsExpanded.value = false;
+        isResultThoughtsExpanded.value = false;
+        update();
         
         _priorityTimer?.cancel();
         _priorityTimer = Timer(const Duration(seconds: 3), () {
@@ -126,13 +139,20 @@ class HomeController extends GetxController {
       agentState.value = 2; // Working
       isThinking.value = true;
       currentThought.value = thought;
+      if (thought.isNotEmpty) {
+        thoughts.add(thought);
+      }
     };
 
     socketService.onActionResult = (data) {
       isThinking.value = false;
       final result = data['result'] ?? "";
+      if (result.toString().isNotEmpty) {
+        thoughts.add("Execution Success: $result");
+      }
       
       if (result.toString().trim().isEmpty || result == "Error executing action.") {
+        thoughts.add("Execution Failed: I encountered an error.");
         // Handle failure: skip result panel and show retry dialogue
         agentState.value = 1; // Show as "Intervention Required"
         dialogueTitle.value = "Execution Failed";
@@ -156,6 +176,7 @@ class HomeController extends GetxController {
         // Success: normal flow
         agentState.value = 0; // Back to Idle
         lastResult.value = result;
+        isResultThoughtsExpanded.value = false;
         showResultPanel(data['action_id'], result);
 
         // Wait 5 seconds for user to read result, then fetch next task
@@ -167,7 +188,13 @@ class HomeController extends GetxController {
             dialogueTitle.value = "Working...";
             dialogueBody.value = "Preparing next task.";
             currentThought.value = "Getting ready for the next task...";
+
+            thoughts.clear(); // Clear thoughts for new task
+            resultThoughts.clear(); // Clear result thoughts when new task starts
+            isThoughtsExpanded.value = false;
+            isResultThoughtsExpanded.value = false;
             update();
+
             socketService.getPriority();
           }
         });
@@ -261,29 +288,63 @@ class HomeController extends GetxController {
         end: end,
       );
 
+      _lastActionId = actionId;
+      _lastActionPayload = payload;
+
       switch (result) {
         case CalendarResult.success:
+          agentState.value = 0;
           dialogueTitle.value = "Event Created";
           dialogueBody.value = "I've added '$title' to your calendar.";
           executeAction(actionId, "Event Created", isSilent: true);
           break;
 
         case CalendarResult.permissionDenied:
+          agentState.value = 1;
           dialogueTitle.value = "Permission Denied";
           dialogueBody.value = "I can't access your calendar. Please enable permissions in Settings.";
+          
+          dynamicActions.assignAll([
+            {
+              "id": actionId,
+              "label": "🔄 Retry",
+              "type": "calendar_event",
+              "payload": payload
+            },
+            {
+              "id": "none",
+              "label": "❌ Cancel",
+              "type": "none",
+              "payload": ""
+            }
+          ]);
+
           Future.delayed(const Duration(seconds: 2), () {
             AppSettings.openAppSettings(type: AppSettingsType.settings);
           });
           break;
 
         case CalendarResult.noCalendars:
+          agentState.value = 1;
           dialogueTitle.value = "No Calendar Found";
           dialogueBody.value = "Your device has no calendar accounts set up. Please open your Calendar app and add an account.";
           
+          dynamicActions.assignAll([
+            {
+              "id": actionId,
+              "label": "🔄 Retry",
+              "type": "calendar_event",
+              "payload": payload
+            },
+            {
+              "id": "none",
+              "label": "❌ Cancel",
+              "type": "none",
+              "payload": ""
+            }
+          ]);
+
           Future.delayed(const Duration(seconds: 4), () async {
-             // Try to open the default calendar app
-             // Android: content://com.android.calendar/time/
-             // iOS: calshow://
              final url = Uri.parse(
               Theme.of(Get.context!).platform == TargetPlatform.android 
                 ? 'content://com.android.calendar/time/' 
@@ -296,17 +357,48 @@ class HomeController extends GetxController {
           break;
 
         case CalendarResult.error:
+          agentState.value = 1;
           dialogueTitle.value = "Calendar Error";
           dialogueBody.value = "Something went wrong while setting up the event.";
+          
+          dynamicActions.assignAll([
+            {
+              "id": actionId,
+              "label": "🔄 Retry",
+              "type": "calendar_event",
+              "payload": payload
+            },
+            {
+              "id": "none",
+              "label": "❌ Cancel",
+              "type": "none",
+              "payload": ""
+            }
+          ]);
           break;
       }
     } catch (e) {
       print("Calendar Error: $e");
+      agentState.value = 1;
       dialogueTitle.value = "Calendar Error";
       dialogueBody.value = "Something went wrong while setting up the event.";
+      
+      dynamicActions.assignAll([
+        {
+          "id": actionId,
+          "label": "🔄 Retry",
+          "type": "calendar_event",
+          "payload": payload
+        },
+        {
+          "id": "none",
+          "label": "❌ Cancel",
+          "type": "none",
+          "payload": ""
+        }
+      ]);
     }
     
-    agentState.value = 0;
     isThinking.value = false;
   }
 
@@ -342,8 +434,18 @@ class HomeController extends GetxController {
         dialogueTitle.value = "Working...";
         dialogueBody.value = "Preparing next task.";
         currentThought.value = "Checking for new priorities...";
+        thoughts.clear(); // Clear thoughts for new task
+        resultThoughts.clear(); // Clear result thoughts when new task starts
+        isThoughtsExpanded.value = false;
+        isResultThoughtsExpanded.value = false;
+
+        thoughts.clear(); // Clear thoughts for new task
+        resultThoughts.clear(); // Clear result thoughts when new task starts
+        isThoughtsExpanded.value = false;
+        isResultThoughtsExpanded.value = false;
         update();
         socketService.getPriority();
+
       }
     });
   }
@@ -371,6 +473,11 @@ class HomeController extends GetxController {
       dialogueTitle.value = "Working...";
       dialogueBody.value = "Checking for updates...";
       currentThought.value = "Looking for relevant tasks...";
+
+      thoughts.clear(); // Clear thoughts for new task
+      resultThoughts.clear(); // Clear result thoughts when new task starts
+      isThoughtsExpanded.value = false;
+      isResultThoughtsExpanded.value = false;
       update();
       socketService.getPriority();
       return;
@@ -394,7 +501,13 @@ class HomeController extends GetxController {
         dialogueTitle.value = "Working...";
         dialogueBody.value = "Preparing next task.";
         currentThought.value = "Getting ready for the next task...";
+
+        thoughts.clear(); // Clear thoughts for new task
+        resultThoughts.clear(); // Clear result thoughts when new task starts
+        isThoughtsExpanded.value = false;
+        isResultThoughtsExpanded.value = false;
         update();
+
         socketService.getPriority();
       }
     });
@@ -417,6 +530,7 @@ class HomeController extends GetxController {
 
   void showResultPanel(String actionId, String result) {
     // Open the result view in the sliding panel
+    resultThoughts.assignAll(thoughts); // Freeze thoughts for this result
     final inputController = Get.find<HomeInputController>();
     inputController.activeChannel.value = InputChannel.result;
     inputController.panelController.open();
@@ -428,6 +542,8 @@ class HomeController extends GetxController {
 
     agentState.value = 2; // Working/Thinking
     isThinking.value = true;
+    thoughts.clear();
+    isThoughtsExpanded.value = false;
     dialogueTitle.value = "Analyzing Image";
     currentThought.value = "Scanning visual content...";
     update();
@@ -454,6 +570,8 @@ class HomeController extends GetxController {
 
     agentState.value = 2; // Working/Thinking
     isThinking.value = true;
+    thoughts.clear();
+    isThoughtsExpanded.value = false;
     dialogueTitle.value = "Analyzing Voice";
     currentThought.value = "Transcribing audio content...";
     update();
@@ -480,6 +598,8 @@ class HomeController extends GetxController {
 
     agentState.value = 2; // Working/Thinking
     isThinking.value = true;
+    thoughts.clear();
+    isThoughtsExpanded.value = false;
     dialogueTitle.value = "Analyzing Input";
     currentThought.value = "Processing your message...";
     update();

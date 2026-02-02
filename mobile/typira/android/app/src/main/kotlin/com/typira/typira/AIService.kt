@@ -22,7 +22,7 @@ class AIService {
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    private val BASE_URL = "http://192.168.1.186:7009" // Using adb reverse
+    private val BASE_URL = "https://typira.celestineobi.com/api"
     private var currentSuggestionCall: Call? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 

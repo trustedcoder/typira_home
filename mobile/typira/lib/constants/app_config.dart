@@ -4,10 +4,11 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 
 class AppConfig {
-  // static const String baseUrl = "http://172.20.10.7:7009/api";
-  // static const String socketUrl = "http://172.20.10.7:7009";
-  static const String baseUrl = "http://192.168.1.241:7009/api";
-  static const String socketUrl = "http://192.168.1.241:7009";
+  // static const String baseUrl = "http://192.168.1.241:7009/api";
+  // static const String socketUrl = "http://192.168.1.241:7009";
+
+  static const String baseUrl = "https://typira.celestineobi.com/api";
+  static const String socketUrl = "https://typira.celestineobi.com";
   static const String login = "$baseUrl/auth/login";
   static const String register = "$baseUrl/auth/register";
   static const String getUser = "$baseUrl/user/me";

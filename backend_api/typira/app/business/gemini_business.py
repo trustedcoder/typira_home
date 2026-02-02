@@ -8,7 +8,7 @@ from app.business.prompts import BASE_PERSONA, KEYBOARD_PERSONA, INSIGHTS_SCHEMA
 
 class GeminiBusiness:
     # Initialize Gemini
-    client = genai.Client()
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
     model_name = 'gemini-3-flash-preview'
 
     @staticmethod
@@ -475,7 +475,7 @@ Sentence:"""
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type='application/json',
-                    tools=[types.Tool(google_search_retrieval=types.GoogleSearchRetrieval())]
+                    # tools=[types.Tool(google_search_retrieval=types.GoogleSearchRetrieval())]
                 )
             )
             import json

@@ -15,8 +15,12 @@ class AppHelper{
     try {
       final Map<String, dynamic> data = json.decode(payload);
       if (data.containsKey('memory_id')) {
-        String memoryId = data['memory_id'];
+        // Ensure memoryId is treated as a string, regardless of incoming type
+        String memoryId = data['memory_id'].toString();
+        print("Navigating to memory detail with ID: $memoryId");
         Get.toNamed('/memory-detail', arguments: memoryId);
+      } else {
+        logger.w("Notification payload missing 'memory_id': $data");
       }
     } catch (e) {
       logger.e("Error parsing notification payload: $e");

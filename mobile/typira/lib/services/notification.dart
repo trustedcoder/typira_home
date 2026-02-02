@@ -25,8 +25,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class NotificationService {
   static final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
+  static bool _isSetup = false;
+
   static Future<void> setupFirebaseMessaging() async {
+    if (_isSetup) return;
+    _isSetup = true;
+
     FirebaseMessaging messaging = FirebaseMessaging.instance;
+    print("🔔 Requesting Notification Permissions...");
     NotificationSettings settings = await messaging.requestPermission(
       alert: true,
       announcement: false,
@@ -37,17 +43,24 @@ class NotificationService {
       sound: true,
     );
 
+    print("🔔 Authorization Status: ${settings.authorizationStatus}");
+
     if(Platform.isIOS){
       await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-        alert: true, // Required to display a heads up notification
+        alert: false, // Set to false to prevent duplicate notifications (system + local)
         badge: true,
         sound: true,
       );
     }
 
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
-      print('User denied permission');
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+       print("🟢 User granted permission");
+    } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
+       print("🟡 User granted provisional permission");
+    } else {
+       print("🔴 User declined or has not accepted permission");
     }
+
 
     // Listen for token refreshes
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
@@ -55,12 +68,21 @@ class NotificationService {
       updateFCMToken(newToken);
     });
 
+    // Check if the app was opened from a terminated state
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        handleMessage(message);
+      }
+    });
+
+    // Listen for messages when the app is in the background and opened
+    FirebaseMessaging.onMessageOpenedApp.listen(handleMessage);
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('Got a message whilst in the foreground!');
       print('Message data: ${message.data}');
 
-      if (message.notification != null && message.notification?.android != null) {
+      if (message.notification != null) {
         NotificationService.add(
             title: message.notification!.title!,
             body: message.notification!.body!,
@@ -72,6 +94,13 @@ class NotificationService {
       // Handle the received message
     });
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
+
+  static void handleMessage(RemoteMessage message) {
+    if (message.data.isNotEmpty) {
+       print("Handling notification tap: ${message.data}");
+       AppHelper.onMessageNotificationClicked(json.encode(message.data));
+    }
   }
 
   static Future<void> setupLocalNotification() async {
@@ -224,12 +253,20 @@ class NotificationService {
 
   static Future<String?> getFcmToken() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
-    if((Platform.isIOS || Platform.isMacOS) && kDebugMode){
-      return await messaging.getAPNSToken();
+    
+    if (Platform.isIOS || Platform.isMacOS) {
+        // Log APNs token for debugging, but don't return it as FCM token
+        String? apnsToken = await messaging.getAPNSToken();
+        if (kDebugMode) {
+            print("APNs Token: $apnsToken");
+        }
     }
+
     try {
+      // Always request the actual FCM token
       return await messaging.getToken();
     } catch (e) {
+      print("Error fetching FCM token: $e");
       return null;
     }
   }

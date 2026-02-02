@@ -4,7 +4,7 @@ import SocketIO
 
 class TypingHistoryManager {
     
-    private let baseUrl = "http://localhost:7009" 
+    private let baseUrl = "https://typira.celestineobi.com" 
     private var textBuffer = ""
     private var timer: Timer?
     private let debounceDelay: TimeInterval = 2.0
@@ -14,7 +14,7 @@ class TypingHistoryManager {
     var onResultReceived: ((String) -> Void)?
     
     // App Group for sharing JWT token with Flutter app
-    private let appGroupSuiteName: String? = "group.com.typira.shared" 
+    private let appGroupSuiteName: String? = "group.com.typira.appdata" 
     
     private var jwtToken: String? {
         let prefs = appGroupSuiteName != nil ? UserDefaults(suiteName: appGroupSuiteName) : UserDefaults.standard
@@ -39,7 +39,7 @@ class TypingHistoryManager {
             config.insert(.extraHeaders(["Authorization": bearerToken, "authorization": bearerToken]))
         }
         
-        manager = SocketManager(socketURL: URL(string: "http://localhost:7009")!, config: config)
+        manager = SocketManager(socketURL: URL(string: "https://typira.celestineobi.com")!, config: config)
         socket = manager?.socket(forNamespace: "/agent")
         
         socket?.on(clientEvent: .connect) { [weak self] data, ack in

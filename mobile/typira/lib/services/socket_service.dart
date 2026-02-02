@@ -33,6 +33,7 @@ class SocketService {
         .setExtraHeaders({'Authorization': 'Bearer $token'})
         .enableAutoConnect()
         .setReconnectionAttempts(5) // Retry a few times
+        .enableMultiplex()
         .build()
     );
 

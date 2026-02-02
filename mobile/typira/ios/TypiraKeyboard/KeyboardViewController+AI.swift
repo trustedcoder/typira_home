@@ -16,7 +16,7 @@ extension KeyboardViewController {
              return
         }
 
-        guard let url = URL(string: "http://localhost:7009/suggest") else { return }
+        guard let url = URL(string: "https://typira.celestineobi.com/api/suggest") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -249,7 +249,7 @@ extension KeyboardViewController {
              prefs.set(memories, forKey: "typira_memories")
              
              // Sync backend
-             guard let url = URL(string: "http://localhost:8000/remember") else { return }
+             guard let url = URL(string: "https://typira.celestineobi.com/remember") else { return }
              var request = URLRequest(url: url)
              request.httpMethod = "POST"
              request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")

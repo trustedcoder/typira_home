@@ -14,7 +14,7 @@ import '../fragments/insights_fragment.dart';
 import 'rewrite_activity.dart'; // Import Rewrite Activity
 
 class HomeActivity extends StatelessWidget {
-  const HomeActivity({super.key});
+  HomeActivity({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -211,78 +211,147 @@ class HomeActivity extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(minHeight: 120.h), // Minimum height, but lets Expanded control max
+      constraints: BoxConstraints(minHeight: 120.h),
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20.r),
         border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
-      child: isWorking 
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Unified Header
+          Row(
             children: [
-               Row(
-                 children: [
-                   SizedBox(width: 16.w, height: 16.w, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentColor)),
-                   SizedBox(width: 12.w),
-                   Text("AGENT THINKING", style: TextStyle(color: AppTheme.accentColor, fontSize: 10.sp, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                 ],
-               ),
-               SizedBox(height: 12.h),
-               Expanded(
-                 child: SingleChildScrollView(
-                   child: Text(
-                     controller.currentThought.value,
-                     style: TextStyle(color: Colors.white, fontSize: 16.sp, fontFamily: 'Courier'), // Monospace for "Terminal" feel
-                   ),
-                 ),
-               ),
+              if (isWorking)
+                SizedBox(width: 14.w, height: 14.w, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accentColor))
+              else
+                Icon(Icons.auto_awesome, color: AppTheme.greenColor, size: 16.sp),
+              SizedBox(width: 8.w),
+              Text(
+                (isWorking ? "AGENT THINKING" : controller.dialogueTitle.value).toUpperCase(),
+                style: TextStyle(
+                  color: isWorking ? AppTheme.accentColor : AppTheme.greenColor,
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2
+                ),
+              ),
             ],
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          ),
+          SizedBox(height: 5.h),
+          if (controller.thoughts.isNotEmpty) ...[
+            GestureDetector(
+              onTap: () => controller.isThoughtsExpanded.toggle(),
+              behavior: HitTestBehavior.opaque,
+              child: Row(
                 children: [
-                  Icon(Icons.auto_awesome, color: AppTheme.greenColor, size: 16.sp),
-                  SizedBox(width: 8.w),
                   Text(
-                    controller.dialogueTitle.value.toUpperCase(),
-                    style: TextStyle(color: AppTheme.greenColor, fontSize: 12.sp, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+                    "Thought process",
+                    style: TextStyle(color: Colors.white54, fontSize: 10.sp, fontWeight: FontWeight.w500),
+                  ),
+                  SizedBox(width: 4.w),
+                  Icon(
+                    controller.isThoughtsExpanded.value ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: Colors.white54,
+                    size: 20.sp,
                   ),
                 ],
               ),
-              SizedBox(height: 8.h),
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Text(
-                    controller.dialogueBody.value,
-                    style: TextStyle(color: Colors.white, fontSize: 15.sp, fontWeight: FontWeight.w400),
+            ),
+          ],
+          SizedBox(height: 5.h),
+          // Content Area
+          if (controller.isThoughtsExpanded.value && controller.thoughts.isNotEmpty) ...[
+            Expanded(
+              child: _buildThoughtsList(controller),
+            ),
+          ] else ...[
+            Expanded(
+              child: SingleChildScrollView(
+                child: Text(
+                  isWorking ? controller.currentThought.value : controller.dialogueBody.value,
+                  style: TextStyle(
+                    color: Colors.white, 
+                    fontSize: 16.sp, 
+                    fontFamily: isWorking ? 'Courier' : 'Inter',
+                    fontWeight: isWorking ? FontWeight.normal : FontWeight.w400
                   ),
                 ),
               ),
-              if (controller.agentState.value == 1 && controller.dynamicActions.isNotEmpty) ...[
-                SizedBox(height: 12.h),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: controller.dynamicActions.map((action) {
-                      final index = controller.dynamicActions.indexOf(action);
-                      return Padding(
-                        padding: EdgeInsets.only(right: 12.w),
-                        child: _buildReplyChip(
-                          action['label'] ?? "Select", 
-                          () => controller.handleDynamicAction(action),
-                          isPrimary: index == 0 && action['id'] != "none" && action['id'] != "decline",
-                        ),
-                      );
-                    }).toList(),
+            ),
+          ],
+          // Actions Area (Chip row)
+          if (!isWorking && controller.agentState.value == 1 && controller.dynamicActions.isNotEmpty) ...[
+            SizedBox(height: 12.h),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: controller.dynamicActions.map((action) {
+                  final index = controller.dynamicActions.indexOf(action);
+                  return Padding(
+                    padding: EdgeInsets.only(right: 12.w),
+                    child: _buildReplyChip(
+                      action['label'] ?? "Select", 
+                      () => controller.handleDynamicAction(action),
+                      isPrimary: index == 0 && action['id'] != "none" && action['id'] != "decline",
+                    ),
+                  );
+                }).toList(),
+              ),
+            )
+          ]
+        ],
+      ),
+    );
+
+  }
+
+  final ScrollController _thoughtsScrollController = ScrollController();
+
+  Widget _buildThoughtsList(HomeController controller) {
+    // Auto-scroll logic
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_thoughtsScrollController.hasClients) {
+        _thoughtsScrollController.animateTo(
+          _thoughtsScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
+    return Container(
+      padding: EdgeInsets.all(8.w),
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: ListView.builder(
+        controller: _thoughtsScrollController,
+        itemCount: controller.thoughts.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: EdgeInsets.symmetric(vertical: 4.h),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "> ",
+                  style: TextStyle(color: AppTheme.accentColor, fontSize: 13.sp, fontFamily: 'Courier'),
+                ),
+                Expanded(
+                  child: Text(
+                    controller.thoughts[index],
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13.sp, fontFamily: 'Courier'),
                   ),
-                )
-              ]
-            ],
-          ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -589,6 +658,54 @@ class HomeActivity extends StatelessWidget {
             ),
           ),
           SizedBox(height: 20.h),
+          
+          if (homeController.resultThoughts.isNotEmpty) ...[
+             Obx(() => Column(
+               children: [
+                 InkWell(
+                   onTap: () => homeController.isResultThoughtsExpanded.toggle(),
+                   child: Row(
+                     children: [
+                       Text("Thought Process", style: TextStyle(color: Colors.white54, fontSize: 14.sp)),
+                       SizedBox(width: 4.w),
+                       Icon(
+                          homeController.isResultThoughtsExpanded.value ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                          color: Colors.white54,
+                          size: 20.sp,
+                        ),
+                     ],
+                   ),
+                 ),
+                 if (homeController.isResultThoughtsExpanded.value)
+                   Container(
+                     height: 150.h,
+                     margin: EdgeInsets.only(top: 8.h),
+                     padding: EdgeInsets.all(8.w),
+                     decoration: BoxDecoration(
+                        color: Colors.black26, 
+                        borderRadius: BorderRadius.circular(12.r)
+                      ),
+                      child: ListView.builder(
+                        itemCount: homeController.resultThoughts.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: EdgeInsets.symmetric(vertical: 4.h),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("> ", style: TextStyle(color: AppTheme.accentColor, fontSize: 12.sp, fontFamily: 'Courier')),
+                                Expanded(child: Text(homeController.resultThoughts[index], style: TextStyle(color: Colors.white70, fontSize: 12.sp, fontFamily: 'Courier'))),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                   )
+               ],
+             )),
+             SizedBox(height: 20.h),
+          ],
+
           Row(
             children: [
               Expanded(

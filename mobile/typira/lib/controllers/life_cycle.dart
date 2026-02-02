@@ -1,6 +1,12 @@
 import 'package:get/get.dart';
+import '../services/notification.dart';
 
 class LifeCycleController extends SuperController {
+
+  @override
+  void onInit() {
+    super.onInit();
+  }
 
   @override
   void onDetached() {

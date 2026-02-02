@@ -7,7 +7,7 @@ class SessionManager {
   static const String keyIsSeenIntro = "isSeenIntro";
   static const String keyIsLoggedIn = "isLoggedIn";
   static const String keyAuth = "auth";
-  static const String appGroupId = "group.com.typira.shared";
+  static const String appGroupId = "group.com.typira.appdata";
   static const String keyUserName = "userName";
 
   static Future initSharedPrefrence() async {

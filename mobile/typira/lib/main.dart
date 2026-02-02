@@ -92,7 +92,7 @@ class MyApp extends StatelessWidget {
         ),
         GetPage(
           name: '/home',
-          page: () => const HomeActivity(),
+          page: () =>  HomeActivity(),
           transition: Transition.fadeIn,
           curve: Curves.easeInOut,
         ),

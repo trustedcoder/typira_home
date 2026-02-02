@@ -1,7 +1,6 @@
 import datetime
 import pytz
 import traceback
-from flask import current_app
 from app import db, socketio
 from app.models.scheduler import Schedule
 from app.models.context import Memory, TypingHistory, UserAction
@@ -15,15 +14,12 @@ def dispatch_due_schedules(app):
     """
     # Use app context since this runs in a separate thread
     with app.app_context():
-        print("BBBBBBBBB")
         try:
             now_utc = datetime.datetime.utcnow()
             schedules = Schedule.query.all()
             
             for schedule in schedules:
-                print("VVVVVVV")
                 if is_due(schedule, now_utc):
-                    print("TESTING SCHEL")
                     # We use a socket background task or separate thread to not block the main scheduler loop
                     process_schedule(schedule)
         except Exception as e:
@@ -65,21 +61,17 @@ def is_due(schedule, now_utc):
         # 1. Check if it already ran in this same minute (to avoid overlaps)
         if schedule.last_run:
             if schedule.last_run.strftime("%Y-%m-%d %H:%M") == now_utc.strftime("%Y-%m-%d %H:%M"):
-                print("hhhhhhhh")
                 return False
 
         # 2. Parse schedule timezone
         tz = get_timezone_obj(schedule.timezone)
         local_now = now_utc.replace(tzinfo=pytz.utc).astimezone(tz)
-
-        print("fffffff")
         
         # 3. Check time match (HH:mm)
         local_time_str = local_now.strftime("%H:%M")
         print(local_time_str)
         print(schedule.time)
         if local_time_str != schedule.time:
-            print("rrrrrrrr")
             return False
             
         # 4. Check Date or Repeat
@@ -95,7 +87,6 @@ def is_due(schedule, now_utc):
         if schedule.date_or_repeat == local_now.strftime("%Y-%m-%d"):
             return True
 
-        print("lllllllll")
         return False
     except Exception as e:
         print(f"Error checking schedule {schedule.id}: {e}")
@@ -133,6 +124,8 @@ def process_schedule(schedule):
             action_history, 
             current_time=current_time_str
         )
+
+        print(insight)
         
         title = insight.get('title', 'Scheduled Update')
         short_desc = insight.get('short_description', 'I have a new personal insight for you.')

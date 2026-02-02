@@ -106,7 +106,7 @@ def find_priority(user_id, platform=None):
     thoughts = task.get('thoughts', [])
     for thought in thoughts:
         emit('thought_update', {'text': thought}, room=request.sid, namespace='/home')
-        socketio.sleep(3) # Short pause for readability
+        socketio.sleep(2) # Short pause for readability
     
     # 3. Emit Result
     # We check if the primary action (the first one) has already been handled.
@@ -239,7 +239,7 @@ def handle_analyze(data):
     thoughts = analysis.get('thoughts', [])
     for thought in thoughts:
         emit('thought_update', {'text': thought})
-        socketio.sleep(10) # Allow user to read the thinking process
+        socketio.sleep(2) # Allow user to read the thinking process
         
     # 4. Finalize and Show Actions
     insights = analysis.get('insights')
@@ -320,7 +320,7 @@ def handle_approve_action(data):
     thoughts = execution.get('thoughts', [])
     for thought in thoughts:
         emit('thought_update', {'text': thought}, namespace='/home')
-        socketio.sleep(3) # Short pause for readability
+        socketio.sleep(2) # Short pause for readability
 
     # 5. Save to Memory for future reference
     if execution.get('result'):
@@ -487,7 +487,7 @@ def handle_analyze_image(data):
     thoughts = analysis.get('thoughts', [])
     for thought in thoughts:
         emit('thought_update', {'text': thought}, namespace='/home')
-        socketio.sleep(3)
+        socketio.sleep(2)
 
     # 4. Store Representative Context in Memory
     # Extract the summary from the 'save_to_memory' action payload or use the plan
@@ -569,7 +569,7 @@ def handle_analyze_voice(data):
     thoughts = analysis.get('thoughts', [])
     for thought in thoughts:
         emit('thought_update', {'text': thought}, namespace='/home')
-        socketio.sleep(3)
+        socketio.sleep(2)
 
     # 4. Store Transcription and Insight in Memory
     transcription = analysis.get('transcription', 'Audio recording')
@@ -655,7 +655,7 @@ def handle_analyze_text(data):
     thoughts = analysis.get('thoughts', [])
     for thought in thoughts:
         emit('thought_update', {'text': thought}, namespace='/home')
-        socketio.sleep(3)
+        socketio.sleep(2)
 
     # 4. Emit Result
     insights = analysis.get('insights')
