@@ -164,3 +164,26 @@ class MemoryResource(Resource):
             }
         else:
             api.abort(400, "Unknown prefix")
+
+@api.route('/clear')
+class MemoryPurge(Resource):
+    @api.doc('clear_user_ai_memory')
+    @token_required
+    def delete(self, current_user, *args, **kwargs):
+        """
+        Permanently clears all AI-related data (Memories, Typing History, Actions) for the current user.
+        This does NOT delete the user account.
+        """
+        try:
+            # Delete Memories
+            Memory.query.filter_by(user_id=current_user.id).delete()
+            # Delete Typing History
+            TypingHistory.query.filter_by(user_id=current_user.id).delete()
+            # Delete User Actions
+            UserAction.query.filter_by(user_id=current_user.id).delete()
+            
+            db.session.commit()
+            return {'status': 1, 'message': 'AI memory cleared successfully.'}, 200
+        except Exception as e:
+            db.session.rollback()
+            return {'status': 0, 'message': f'Error clearing memory: {str(e)}'}, 500

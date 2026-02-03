@@ -21,6 +21,11 @@ extension KeyboardViewController {
             return
         }
         
+        if sender.tag == 104 { // Next Keyboard (Globe)
+            self.advanceToNextInputMode()
+            return
+        }
+        
         if sender.tag == 105 { // Emoji Delete
             proxy.deleteBackward()
             isLastKeyWordBoundary = false

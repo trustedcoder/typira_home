@@ -14,7 +14,13 @@ class User(db.Model):
     password = db.Column(db.String(225), nullable=True)
     is_email_verified = db.Column(db.Boolean, default=False)
     name = db.Column(db.String(225), nullable=True)
-    fcm_tokens = db.relationship('FCMTokens', back_populates='user', lazy=True)
+    fcm_tokens = db.relationship('FCMTokens', back_populates='user', lazy=True, cascade="all, delete-orphan")
+    typing_history = db.relationship('TypingHistory', cascade="all, delete-orphan", lazy=True)
+    memories = db.relationship('Memory', cascade="all, delete-orphan", lazy=True)
+    user_actions = db.relationship('UserAction', cascade="all, delete-orphan", lazy=True)
+    insights = db.relationship('UserInsight', cascade="all, delete-orphan", uselist=False, lazy=True)
+    activity_history = db.relationship('UserActivityHistory', cascade="all, delete-orphan", lazy=True)
+    schedules = db.relationship('Schedule', cascade="all, delete-orphan", lazy=True)
 
     def __repr__(self):
         return "{}".format(self.email)

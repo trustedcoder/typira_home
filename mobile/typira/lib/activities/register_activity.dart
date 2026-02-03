@@ -7,6 +7,8 @@ import 'package:get/get.dart';
 import '../constants/app_theme.dart';
 import '../controllers/register.dart';
 import 'login_activity.dart';
+import '../constants/app_config.dart';
+import 'webview_activity.dart';
 
 class RegisterActivity extends StatelessWidget {
   const RegisterActivity({super.key});
@@ -54,9 +56,9 @@ class RegisterActivity extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                            "Name",
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                          "Name",
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ],
                     ),
                     Container(
@@ -73,7 +75,10 @@ class RegisterActivity extends StatelessWidget {
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
                           hintText: "Enter Name",
-                          hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textColor),
+                          hintStyle: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppTheme.textColor),
                           border: InputBorder.none,
                         ),
                       ),
@@ -81,9 +86,9 @@ class RegisterActivity extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                            "Email",
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                          "Email",
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ],
                     ),
                     Container(
@@ -100,18 +105,20 @@ class RegisterActivity extends StatelessWidget {
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
                           hintText: "Enter email",
-                          hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textColor),
+                          hintStyle: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppTheme.textColor),
                           border: InputBorder.none,
                         ),
                       ),
                     ),
-
                     Row(
                       children: [
                         Text(
-                            "Password",
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                          "Password",
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ],
                     ),
                     Container(
@@ -128,19 +135,21 @@ class RegisterActivity extends StatelessWidget {
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
                           hintText: "Enter Your Password",
-                          hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textColor),
+                          hintStyle: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppTheme.textColor),
                           border: InputBorder.none,
                         ),
                         obscureText: true,
                       ),
                     ),
-
                     Row(
                       children: [
                         Text(
-                            "Confirm Password",
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
+                          "Confirm Password",
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                       ],
                     ),
                     Container(
@@ -158,72 +167,134 @@ class RegisterActivity extends StatelessWidget {
                         textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
                           hintText: "Enter Confirm Password",
-                          hintStyle: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textColor),
+                          hintStyle: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppTheme.textColor),
                           border: InputBorder.none,
                         ),
                         obscureText: true,
                       ),
                     ),
                     Obx(() => Row(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        Checkbox(
-                          value: registerController.agreeWithTerms.value,
-                          onChanged: (value) {
-                            registerController.agreeWithTerms.value = value!;
-                          },
-                          activeColor: AppTheme.primaryColor,
-                        ),
-                        Text(
-                          "Agree with terms and condition",
-                          style: Theme.of(context).textTheme.bodySmall,
-                        )
-                      ],
-                    )),
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            Checkbox(
+                              value: registerController.agreeWithTerms.value,
+                              onChanged: (value) {
+                                registerController.agreeWithTerms.value =
+                                    value!;
+                              },
+                              activeColor: AppTheme.primaryColor,
+                            ),
+                            Expanded(
+                              child: Wrap(
+                                children: [
+                                  Text(
+                                    "Agree with ",
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Get.to(() => WebViewActivity(
+                                          title: "Terms of Service",
+                                          url:
+                                              "${AppConfig.baseUrl.replaceAll('/api', '')}/legal/terms"));
+                                    },
+                                    child: Text(
+                                      "terms and condition",
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                              color: AppTheme.primaryColor,
+                                              decoration:
+                                                  TextDecoration.underline),
+                                    ),
+                                  ),
+                                  Text(
+                                    " & ",
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      Get.to(() => WebViewActivity(
+                                          title: "Privacy Policy",
+                                          url:
+                                              "${AppConfig.baseUrl.replaceAll('/api', '')}/legal/privacy"));
+                                    },
+                                    child: Text(
+                                      "Privacy Policy",
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                              color: AppTheme.primaryColor,
+                                              decoration:
+                                                  TextDecoration.underline),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        )),
                     SizedBox(height: 20.h),
                     Row(
                       children: [
                         Expanded(
-                            child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            padding: EdgeInsets.symmetric(horizontal: 100.w),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8.r),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryColor,
+                              padding: EdgeInsets.symmetric(horizontal: 100.w),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                            ),
+                            onPressed: () {
+                              registerController.register();
+                            },
+                            child: Text(
+                              'Register',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(color: AppTheme.whiteColor),
                             ),
                           ),
-                          onPressed: () {
-                            registerController.register();
-                          },
-                          child: Text(
-                            'Register',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppTheme.whiteColor),
-                          ),
-                        ))
+                        )
                       ],
                     ),
                     SizedBox(height: 8.h),
                     Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: 'Already a Member?',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.grayColor),
-                            ),
-                            TextSpan(
-                              text: ' Sign In',
-                              recognizer: TapGestureRecognizer()
-                                ..onTap = () {
-                                  Get.to(() => const LoginActivity());
-                                },
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.primaryColor),
-                            ),
-                          ],
-                        ),
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Already a Member?',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: AppTheme.grayColor),
+                          ),
+                          TextSpan(
+                            text: ' Sign In',
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                Get.to(() => const LoginActivity());
+                              },
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: AppTheme.primaryColor),
+                          ),
+                        ],
                       ),
+                    ),
                   ],
                 ),
-              )
+              ),
             ],
           ),
         ),

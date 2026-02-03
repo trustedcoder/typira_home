@@ -205,12 +205,12 @@ class SetupActivity extends StatelessWidget {
           SizedBox(height: 12.h),
           Text(
             Platform.isIOS 
-              ? "Follow the steps above to enable full access."
+              ? "Follow the steps above to enable full access.\nThis allows Typira to sync your typing context for personalized AI memory and manage your calendar."
               : "Enable Typira Keyboard in your settings to start using AI features.",
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white70,
-              fontSize: 16.sp,
+              fontSize: 14.sp,
               height: 1.5,
             ),
           ),

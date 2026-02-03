@@ -65,4 +65,32 @@ class Authentication {
       return Future.error(exception.toString());
     }
   }
+
+  Future<dynamic> deleteAccount() async {
+    final request = http.Request('DELETE', Uri.parse(AppConfig.delete_account))
+      ..headers['Content-Type'] = 'application/json';
+
+    try {
+      final response = await _client.send(request);
+      final responseBody = await response.stream.bytesToString();
+      return json.decode(responseBody);
+    } catch (exception) {
+      print(exception.toString());
+      return Future.error(exception.toString());
+    }
+  }
+
+  Future<dynamic> clearMemory() async {
+    final request = http.Request('DELETE', Uri.parse(AppConfig.clear_memory))
+      ..headers['Content-Type'] = 'application/json';
+
+    try {
+      final response = await _client.send(request);
+      final responseBody = await response.stream.bytesToString();
+      return json.decode(responseBody);
+    } catch (exception) {
+      print(exception.toString());
+      return Future.error(exception.toString());
+    }
+  }
 }

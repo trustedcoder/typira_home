@@ -16,6 +16,14 @@ extension KeyboardViewController {
              return
         }
 
+        // SAFETY: Explicitly disable AI for sensitive keyboard types
+        let proxy = self.textDocumentProxy
+        let sensitiveTypes: [UIKeyboardType] = [.numberPad, .phonePad, .decimalPad, .namePhonePad, .emailAddress]
+        if let kType = proxy.keyboardType, sensitiveTypes.contains(kType) {
+            NSLog("DEBUG: [Security] AI disabled for sensitive keyboard type: \(kType.rawValue)")
+            return
+        }
+
         guard let url = URL(string: "https://typira.celestineobi.com/api/suggest") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -249,7 +257,7 @@ extension KeyboardViewController {
              prefs.set(memories, forKey: "typira_memories")
              
              // Sync backend
-             guard let url = URL(string: "https://typira.celestineobi.com/remember") else { return }
+             guard let url = URL(string: "https://typira.celestineobi.com/api/remember") else { return }
              var request = URLRequest(url: url)
              request.httpMethod = "POST"
              request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")

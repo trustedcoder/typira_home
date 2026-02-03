@@ -23,5 +23,4 @@ class Login(Resource):
         Authenticate a user with JWT token
         """
         data = request.get_json()
-        
         return AuthBusiness.login_user(data=data)

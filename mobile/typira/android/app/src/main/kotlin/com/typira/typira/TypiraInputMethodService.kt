@@ -179,6 +179,11 @@ class TypiraInputMethodService : InputMethodService() {
         space?.setOnClickListener { onKeyClick("space") }
         setupSpaceKeyTrackpad(space)
 
+        rootView.findViewById<Button>(R.id.key_globe)?.setOnClickListener {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showInputMethodPicker()
+        }
+
         // AI Action Toolbar
         val openAppListener = View.OnClickListener {
             val intent = packageManager.getLaunchIntentForPackage("com.typira.typira")

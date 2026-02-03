@@ -23,6 +23,9 @@ def create_app(config_name):
     from app.api import blueprint
     app.register_blueprint(blueprint)
 
+    from app.endpoints.legal_endpoints import ns as legal_namespace
+    app.register_blueprint(legal_namespace, url_prefix='/legal')
+
     db.init_app(app)
     cors.init_app(app)
     flask_bcrypt.init_app(app)

@@ -7,6 +7,8 @@ import 'package:get/get.dart';
 import '../constants/app_theme.dart';
 import '../controllers/login.dart';
 import '../helpers/route.dart';
+import '../constants/app_config.dart';
+import 'webview_activity.dart';
 
 class LoginActivity extends StatelessWidget {
 
@@ -166,12 +168,50 @@ class LoginActivity extends StatelessWidget {
                       )
                     ],
                   ),
-                )
+                ),
+                SizedBox(height: 20.h),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        Get.to(() => WebViewActivity(
+                            title: "Privacy Policy",
+                            url: "${AppConfig.baseUrl.replaceAll('/api', '')}/legal/privacy"
+                        ));
+                      },
+                      child: Text(
+                        "Privacy Policy",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 20.w),
+                    GestureDetector(
+                      onTap: () {
+                         Get.to(() => WebViewActivity(
+                            title: "Terms of Service",
+                            url: "${AppConfig.baseUrl.replaceAll('/api', '')}/legal/terms"
+                        ));
+                      },
+                      child: Text(
+                        "Terms of Service",
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primaryColor,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20.h),
               ],
             ),
           ),
-      ),
-    );
+        ),
+      );
   }
 
 }

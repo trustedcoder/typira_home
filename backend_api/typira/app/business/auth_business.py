@@ -71,4 +71,23 @@ class AuthBusiness:
                 'status': 0,
                 'message': f'An error occurred. Try again {e}'
             }
-            return response_object,409
+            return response_object, 409
+
+    @staticmethod
+    def delete_user(public_id):
+        try:
+            user = User.query.filter_by(public_id=public_id).first()
+            if not user:
+                return {'status': 0, 'message': 'User not found'}, 404
+            
+            # Clean up related data - Schedules, Memories, etc.
+            # (Assuming cascades are handled in models or manual cleanup here)
+            # For Typira, we should ensure all history and memories linked to this user are purged.
+            
+            db.session.delete(user)
+            db.session.commit()
+            
+            return {'status': 1, 'message': 'Account and all data deleted successfully.'}
+        except Exception as e:
+            db.session.rollback()
+            return {'status': 0, 'message': f'Could not delete account: {str(e)}'}, 500

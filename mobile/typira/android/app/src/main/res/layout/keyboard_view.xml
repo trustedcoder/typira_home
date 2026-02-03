@@ -277,13 +277,20 @@
             <Button android:id="@+id/key_mode" style="@style/KeyboardKeySpecial" android:text="\?123" android:textSize="14sp" android:layout_weight="1.5" />
             
             <Button 
+                android:id="@+id/key_globe" 
+                style="@style/KeyboardKeySpecial" 
+                android:text="🌐"
+                android:textSize="20sp"
+                android:layout_weight="1" />
+
+            <Button 
                 android:id="@+id/key_emoji" 
                 style="@style/KeyboardKeySpecial" 
                 android:text="☺"
                 android:textSize="20sp"
                 android:layout_weight="1.5" />
                 
-            <Button android:id="@+id/key_space" style="@style/KeyboardKey" android:text="" android:layout_weight="5" />
+            <Button android:id="@+id/key_space" style="@style/KeyboardKey" android:text="" android:layout_weight="4" />
             <Button android:id="@+id/key_enter" style="@style/KeyboardKeySpecial" android:text="Go" android:textSize="14sp" android:layout_weight="2" />
         </LinearLayout>
     </LinearLayout>

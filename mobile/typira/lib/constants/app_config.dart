@@ -17,6 +17,8 @@ class AppConfig {
   static const String getTypingHistory = "$baseUrl/memory/typing-history";
   static const String getUserActions = "$baseUrl/memory/user-actions";
   static const String scheduler = "$baseUrl/scheduler/";
+  static const String delete_account = "$baseUrl/user/me";
+  static const String clear_memory = "$baseUrl/memory/clear";
 
 
 

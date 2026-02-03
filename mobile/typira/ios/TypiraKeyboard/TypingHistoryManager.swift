@@ -76,6 +76,12 @@ class TypingHistoryManager {
             return
         }
         
+        // SAFETY: Explicitly disable analysis for sensitive keyboard types
+        let sensitiveTypes: [UIKeyboardType] = [.numberPad, .phonePad, .decimalPad, .namePhonePad, .emailAddress]
+        if let kType = proxy.keyboardType, sensitiveTypes.contains(kType) {
+            return
+        }
+        
         textBuffer += text
         
         timer?.invalidate()
@@ -134,6 +140,12 @@ class TypingHistoryManager {
 
     func sendFullContext(_ fullText: String, proxy: UITextDocumentProxy) {
         if proxy.isSecureTextEntry == true {
+            return
+        }
+        
+        // SAFETY: Explicitly disable analysis for sensitive keyboard types
+        let sensitiveTypes: [UIKeyboardType] = [.numberPad, .phonePad, .decimalPad, .namePhonePad, .emailAddress]
+        if let kType = proxy.keyboardType, sensitiveTypes.contains(kType) {
             return
         }
         

@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:get/get.dart';
 import '../constants/app_theme.dart';
 import '../storage/session_manager.dart';
+import '../api/authentication.dart';
 
 class SettingsActivity extends StatelessWidget {
   const SettingsActivity({super.key});
@@ -38,11 +39,26 @@ class SettingsActivity extends StatelessWidget {
           ),
           SizedBox(height: 16.h),
           _buildSettingsItem(
+            icon: Icons.cleaning_services,
+            title: "Clear AI Memory",
+            subtitle: "Wipe learned style and typing history",
+            onTap: () => _handleClearMemory(),
+          ),
+          SizedBox(height: 16.h),
+          _buildSettingsItem(
             icon: Icons.logout,
             title: "Logout",
             subtitle: "Sign out of your account",
             isDestructive: true,
             onTap: () => _handleLogout(),
+          ),
+          SizedBox(height: 16.h),
+          _buildSettingsItem(
+            icon: Icons.delete_forever,
+            title: "Delete Account",
+            subtitle: "Permanently delete your account and all data",
+            isDestructive: true,
+            onTap: () => _handleDeleteAccount(),
           ),
         ],
       ),
@@ -136,5 +152,143 @@ class SettingsActivity extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _handleDeleteAccount() {
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text("Delete Account", style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "This action is permanent and cannot be undone. All your data, including AI memory and history, will be permanently deleted.",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back(); // Close dialog
+              _performDelete();
+            },
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _performDelete() async {
+    final Authentication authApi = Authentication();
+    
+    // Show loading
+    Get.dialog(
+      const Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
+      barrierDismissible: false,
+    );
+
+    try {
+      final resp = await authApi.deleteAccount();
+      Get.back(); // Remove loading
+
+      if (resp['status'] == 1) {
+        SessionManager.resetApp();
+        Get.offAllNamed("/login");
+        Get.snackbar(
+          "Success",
+          "Your account has been deleted.",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar(
+          "Error",
+          resp['message'] ?? "Could not delete account.",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (e) {
+      Get.back(); // Remove loading
+      Get.snackbar(
+        "Error",
+        "Connection error. Please try again.",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  void _handleClearMemory() {
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text("Clear AI Memory", style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "This will permanently delete your typing history, learned writing style, and agent memory. Your account will remain active. Proceed?",
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white54)),
+          ),
+          TextButton(
+            onPressed: () async {
+              Get.back(); // Close dialog
+              _performMemoryClear();
+            },
+            child: const Text("Clear", style: TextStyle(color: AppTheme.accentColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _performMemoryClear() async {
+    final Authentication authApi = Authentication();
+    
+    // Show loading
+    Get.dialog(
+      const Center(child: CircularProgressIndicator(color: AppTheme.accentColor)),
+      barrierDismissible: false,
+    );
+
+    try {
+      final resp = await authApi.clearMemory();
+      Get.back(); // Remove loading
+
+      if (resp['status'] == 1) {
+        Get.snackbar(
+          "Success",
+          "AI memory has been cleared.",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      } else {
+        Get.snackbar(
+          "Error",
+          resp['message'] ?? "Could not clear memory.",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (e) {
+      Get.back(); // Remove loading
+      Get.snackbar(
+        "Error",
+        "Connection error. Please try again.",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 }

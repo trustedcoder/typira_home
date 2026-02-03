@@ -344,6 +344,11 @@ class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
         
         self.modeButton = createButton(title: "123", isSpecial: true)
         self.modeButton?.tag = 102
+        
+        // Globe (Next Keyboard) Button
+        let globeBtn = createButton(title: "globe", isSpecial: true, isSymbol: true)
+        globeBtn.tag = 104 // Next Keyboard
+        
         self.emojiButton = createButton(title: "😀", isSpecial: true, isSymbol: true)
         self.emojiButton?.tag = 103
         let spaceBtn = createButton(title: "space", isSpecial: false)
@@ -354,13 +359,15 @@ class StickyOverlayFlowLayout: UICollectionViewFlowLayout {
         let returnBtn = createButton(title: "return", isSpecial: true)
         
         bottomRow.addArrangedSubview(modeButton!)
+        bottomRow.addArrangedSubview(globeBtn)
         bottomRow.addArrangedSubview(emojiButton!)
         bottomRow.addArrangedSubview(spaceBtn)
         bottomRow.addArrangedSubview(returnBtn)
         
         NSLayoutConstraint.activate([
-            modeButton!.widthAnchor.constraint(equalTo: emojiButton!.widthAnchor),
-            spaceBtn.widthAnchor.constraint(greaterThanOrEqualTo: emojiButton!.widthAnchor, multiplier: 4),
+            modeButton!.widthAnchor.constraint(equalTo: globeBtn.widthAnchor),
+            globeBtn.widthAnchor.constraint(equalTo: emojiButton!.widthAnchor),
+            spaceBtn.widthAnchor.constraint(greaterThanOrEqualTo: emojiButton!.widthAnchor, multiplier: 3), // Reduced multiplier to accommodate globe
             returnBtn.widthAnchor.constraint(equalTo: emojiButton!.widthAnchor, multiplier: 1.5),
             bottomRow.heightAnchor.constraint(equalToConstant: 45)
         ])

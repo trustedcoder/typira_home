@@ -53,3 +53,13 @@ class UserMe(Resource):
             'status': 1,
             'message': 'Profile updated successfully'
         }, 200
+
+    @ns.doc('Delete current user account')
+    @ns.doc(security="apikey")
+    @token_required
+    def delete(self, current_user, *args, **kwargs):
+        """
+        Permanently deletes the currently logged-in user and all associated data
+        """
+        from app.business.auth_business import AuthBusiness
+        return AuthBusiness.delete_user(current_user.public_id)
