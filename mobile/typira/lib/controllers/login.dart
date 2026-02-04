@@ -18,13 +18,6 @@ class LoginController extends GetxController {
     super.onInit();
   }
 
-  @override
-  void onClose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.onClose();
-  }
-
   Future<void> loginUser({required String email, required String password}) async {
     ProgressDialog progressDialog = ProgressDialog(message: "Please wait...");
     Get.dialog(progressDialog, barrierDismissible: false);

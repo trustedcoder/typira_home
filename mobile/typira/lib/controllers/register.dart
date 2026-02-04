@@ -18,15 +18,6 @@ class RegisterController extends GetxController {
   var agreeWithTerms = false.obs;
   final TextEditingController passwordConfirmationController = TextEditingController();
 
-  @override
-  void onClose() {
-    nameController.dispose();
-    phoneController.dispose();
-    emailController.dispose();
-    passwordController.dispose();
-    passwordConfirmationController.dispose();
-    super.onClose();
-  }
 
   Future<void> registerUser({required String name,required String email, String? fcm_token, required String password}) async {
     ProgressDialog progressDialog = ProgressDialog(message: "Please wait...");

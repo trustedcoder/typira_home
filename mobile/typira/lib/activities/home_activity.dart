@@ -801,14 +801,14 @@ class HomeActivity extends StatelessWidget {
       borderRadius: BorderRadius.circular(24.r),
       child: Container(
         width: 100.w,
-        height: 90.h,
+        height: 180.h,
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(24.r),
           border: Border.all(color: color.withOpacity(0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               blurRadius: 15,
               offset: const Offset(0, 5),
             )
