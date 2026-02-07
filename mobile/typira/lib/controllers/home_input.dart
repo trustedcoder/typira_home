@@ -43,7 +43,9 @@ class HomeInputController extends GetxController {
     if (isRecording.value || isPaused.value) {
       stopAndCancel();
     }
-    panelController.close();
+    if (panelController.isAttached && !panelController.isPanelClosed) {
+      panelController.close();
+    }
     
     // Clear analysis flags and resume priority loop
     final homeController = Get.find<HomeController>();

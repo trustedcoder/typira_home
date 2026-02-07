@@ -63,6 +63,8 @@
 		<string>fetch</string>
 		<string>remote-notification</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access to capture images for processing.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>We need access to microphone for voice input functionality.</string>
 	<key>NSBonjourServices</key>

@@ -260,76 +260,76 @@ class InsightsFragment extends StatelessWidget {
 
   Widget _buildStatCard(String label, String value, IconData icon, Color color, {bool fullWidth = false}) {
     return Container(
-      width: fullWidth ? double.infinity : null,
-      padding: EdgeInsets.all(20.w),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: color, size: 24.sp),
-              if (!fullWidth) Icon(Icons.arrow_upward, color: Colors.green, size: 16.sp), // Trend indicator
-            ],
-          ),
-          SizedBox(height: 16.h),
-          Text(value, style: TextStyle(color: Colors.white, fontSize: 28.sp, fontWeight: FontWeight.bold)),
-          SizedBox(height: 4.h),
-          Text(label, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
-        ],
-      ),
+        width: fullWidth ? double.infinity : null,
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Icon(icon, color: color, size: 24.sp),
+                if (!fullWidth) Icon(Icons.arrow_upward, color: Colors.green, size: 16.sp), // Trend indicator
+              ],
+            ),
+            SizedBox(height: 16.h),
+            Text(value, style: TextStyle(color: Colors.white, fontSize: 28.sp, fontWeight: FontWeight.bold)),
+            SizedBox(height: 4.h),
+            Text(label, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
+          ],
+        ),
     );
   }
 
   Widget _buildBioCard(String title, String value, IconData? icon, Color color, {String subtitle = "", String? emoji}) {
     return Container(
-      padding: EdgeInsets.all(20.w),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(20.r),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(8.w),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle
+        padding: EdgeInsets.all(20.w),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle
+                  ),
+                  child: emoji != null 
+                    ? Text(emoji, style: TextStyle(fontSize: 20.sp))
+                    : Icon(icon, color: color, size: 20.sp),
                 ),
-                child: emoji != null 
-                  ? Text(emoji, style: TextStyle(fontSize: 20.sp))
-                  : Icon(icon, color: color, size: 20.sp),
-              ),
-              Spacer(),
-              Icon(Icons.more_horiz, color: Colors.white24, size: 20.sp),
-            ],
-          ),
-          SizedBox(height: 16.h),
-          Text(value, style: TextStyle(color: Colors.white, fontSize: 22.sp, fontWeight: FontWeight.bold)),
-          SizedBox(height: 4.h),
-          Text(title, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
-          if (subtitle.isNotEmpty) ...[
-            SizedBox(height: 8.h),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: Text(subtitle, style: TextStyle(color: color, fontSize: 10.sp, fontWeight: FontWeight.bold)),
-            )
-          ]
-        ],
-      ),
+                Spacer(),
+                Icon(Icons.more_horiz, color: Colors.white24, size: 20.sp),
+              ],
+            ),
+            SizedBox(height: 16.h),
+            Text(value, style: TextStyle(color: Colors.white, fontSize: 22.sp, fontWeight: FontWeight.bold)),
+            SizedBox(height: 4.h),
+            Text(title, style: TextStyle(color: Colors.white54, fontSize: 12.sp)),
+            if (subtitle.isNotEmpty) ...[
+              SizedBox(height: 8.h),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Text(subtitle, style: TextStyle(color: color, fontSize: 10.sp, fontWeight: FontWeight.bold)),
+              )
+            ]
+          ],
+        ),
     );
   }
 

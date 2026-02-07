@@ -801,7 +801,7 @@ class HomeActivity extends StatelessWidget {
       borderRadius: BorderRadius.circular(24.r),
       child: Container(
         width: 100.w,
-        height: 180.h,
+        height: 90.h,
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(24.r),
