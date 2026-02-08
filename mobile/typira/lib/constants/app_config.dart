@@ -14,6 +14,7 @@ class AppConfig {
   static const String getUser = "$baseUrl/user/me";
   static const String getInsightsStats = "$baseUrl/insights/stats";
   static const String getMemories = "$baseUrl/memory/memories";
+  static const String getMemory = "$baseUrl/memory";
   static const String getTypingHistory = "$baseUrl/memory/typing-history";
   static const String getUserActions = "$baseUrl/memory/user-actions";
   static const String scheduler = "$baseUrl/scheduler/";

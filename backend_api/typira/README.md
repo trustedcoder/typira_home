@@ -27,8 +27,17 @@ The Typira Backend API is built with **Flask** and serves as the central hub for
     ```
 
 4.  **Environment Configuration:**
-    - Create a `.env` file in this directory.
-    - Add necessary environment variables (Database URL, SECRET_KEY, API Keys, etc.).
+    Create a `.env` file in the `backend_api/typira` directory and set the following variables:
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `ENV` | Environment mode (`dev` or `prod`) | `dev` |
+| `SECRET_KEY` | Secret key for JWT encryption and session security | - |
+| `DATABASE_URL` | SQLAlchemy connection string (e.g., `mysql+pymysql://user:pass@host/db`) | - |
+| `GEMINI_API_KEY` | API Key for Google Gemini AI | - |
+
+5.  **Firebase Credentials:**
+    Ensure the Firebase Admin SDK JSON file (`typira-ee2d4-firebase-adminsdk-fbsvc-43257b6e08.json`) is present in the `backend_api/typira` root directory.
 
 ## Database Management
 

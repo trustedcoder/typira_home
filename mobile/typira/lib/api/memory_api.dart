@@ -27,7 +27,7 @@ class MemoryApi {
   }
 
   Future<dynamic> getMemoryDetail(String id) async {
-    final uri = Uri.parse("${AppConfig.getMemories}/$id");
+    final uri = Uri.parse("${AppConfig.getMemory}/$id");
     final request = http.Request('GET', uri)
       ..headers['Content-Type'] = 'application/json';
 
