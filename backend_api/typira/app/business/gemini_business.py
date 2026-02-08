@@ -475,7 +475,7 @@ Sentence:"""
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type='application/json',
-                    tools=[types.Tool(google_search_retrieval=types.GoogleSearchRetrieval())]
+                    tools=[types.Tool(google_search=types.GoogleSearch())]
                 )
             )
             import json
